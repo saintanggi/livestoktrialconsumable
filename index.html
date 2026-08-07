@@ -302,16 +302,16 @@
       <div class="po-sub-tab hidden" id="poTabCreate">
         <div class="form-grid">
           <div class="form-group"><label>Tanggal Order</label><input type="date" id="poTglOrder"></div>
-          <div class="form-group"><label>No PO</label><input type="text" id="poNoPo" placeholder="Contoh: 3100012249"></div>
-          <div class="form-group"><label>Nama Vendor</label><input type="text" id="poVendor" placeholder="Contoh: PT PIALA KEMAS AGUNG"></div>
-          <div class="form-group"><label>Pilih Barang</label><input type="text" id="poItem" list="dlAllItems" placeholder="🔍 Cari barang..."></div>
+          <div class="form-group"><label>No PO</label><input type="text" id="poNoPo" placeholder="Contoh: 3100012249" autocomplete="off"></div>
+          <div class="form-group"><label>Nama Vendor</label><input type="text" id="poVendor" placeholder="Contoh: PT PIALA KEMAS AGUNG" autocomplete="off"></div>
+          <div class="form-group"><label>Pilih Barang</label><input type="text" id="poItem" list="dlAllItems" placeholder="🔍 Cari barang..." autocomplete="off"></div>
           <div class="form-group"><label>Tujuan Gudang</label>
             <select id="poGudang">
               <option value="HO">HO</option>
               <option value="AGEN">AGEN</option>
             </select>
           </div>
-          <div class="form-group"><label>QTY Order</label><input type="number" id="poQtyOrder" min="1" placeholder="0"></div>
+          <div class="form-group"><label>QTY Order</label><input type="number" id="poQtyOrder" min="1" placeholder="0" autocomplete="off"></div>
           <div class="form-group"><label>Due Date (Batas Kirim)</label><input type="date" id="poDueDate"></div>
           <div class="form-group" style="justify-content: flex-end;"><button class="btn btn-primary" onclick="submitNewPo()">Simpan PO Baru</button></div>
         </div>
@@ -324,10 +324,10 @@
             <select id="poDeliverySelectPo" onchange="onPoSelectChange()"></select>
           </div>
           <div class="form-group"><label>Tanggal Penerimaan</label><input type="date" id="poDeliveryTgl"></div>
-          <div class="form-group"><label>No Surat Jalan (SJ)</label><input type="text" id="poDeliveryNoSj" placeholder="Contoh: SJ-99882"></div>
-          <div class="form-group"><label>QTY Masuk (Parsial)</label><input type="number" id="poDeliveryQty" min="1" placeholder="0"></div>
+          <div class="form-group"><label>No Surat Jalan (SJ)</label><input type="text" id="poDeliveryNoSj" placeholder="Contoh: SJ-99882" autocomplete="off"></div>
+          <div class="form-group"><label>QTY Masuk (Parsial)</label><input type="number" id="poDeliveryQty" min="1" placeholder="0" autocomplete="off"></div>
           <div class="form-group" style="grid-column: span 2;"><label>📷 Unggah Foto Surat Jalan (Bukti Fisik)</label><input type="file" id="poDeliveryFile" accept="image/*,application/pdf"></div>
-          <div class="form-group" style="grid-column: span 2;"><label>Keterangan Penerimaan</label><input type="text" id="poDeliveryKet" placeholder="Keterangan tambahan (misal: Sisa kiriman menyusul)"></div>
+          <div class="form-group" style="grid-column: span 2;"><label>Keterangan Penerimaan</label><input type="text" id="poDeliveryKet" placeholder="Keterangan tambahan (misal: Sisa kiriman menyusul)" autocomplete="off"></div>
           <div class="form-group" style="justify-content: flex-end;"><button class="btn btn-primary" onclick="submitPoDelivery()">Proses Penerimaan</button></div>
         </div>
         
@@ -411,17 +411,17 @@
       <h3>🔄 Transfer Stok Antar Gudang</h3>
       <div class="form-grid">
         <div class="form-group"><label>Tanggal</label><input type="date" id="trfTgl"></div>
-        <div class="form-group"><label>No Ticket</label><input type="text" id="trfTicket" placeholder="TRF-001"></div>
+        <div class="form-group"><label>No Ticket</label><input type="text" id="trfTicket" placeholder="TRF-001" autocomplete="off"></div>
         <div class="form-group"><label>Arah</label>
           <select id="trfArah">
             <option value="HO_AGEN">HO → AGEN</option>
             <option value="AGEN_HO">AGEN → HO</option>
           </select>
         </div>
-        <div class="form-group"><label>QTY</label><input type="number" id="trfQty" min="1" placeholder="0"></div>
-        <div class="form-group"><label>Item HO</label><input type="text" id="trfHoItem" list="dlHoItems" placeholder="🔍 Ketik cari item HO..."></div>
-        <div class="form-group"><label>Item AGEN</label><input type="text" id="trfAgenItem" list="dlAgenItems" placeholder="🔍 Ketik cari item AGEN..."></div>
-        <div class="form-group" style="grid-column:span 2;"><label>Keterangan</label><input type="text" id="trfKet" placeholder="Keterangan"></div>
+        <div class="form-group"><label>QTY</label><input type="number" id="trfQty" min="1" placeholder="0" autocomplete="off"></div>
+        <div class="form-group"><label>Item HO</label><input type="text" id="trfHoItem" list="dlHoItems" placeholder="🔍 Ketik cari item HO..." autocomplete="off"></div>
+        <div class="form-group"><label>Item AGEN</label><input type="text" id="trfAgenItem" list="dlAgenItems" placeholder="🔍 Ketik cari item AGEN..." autocomplete="off"></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Keterangan</label><input type="text" id="trfKet" placeholder="Keterangan" autocomplete="off"></div>
         <div class="form-group"><button class="btn btn-primary" onclick="processTransfer()">Proses Transfer</button></div>
       </div>
     </div>
@@ -473,15 +473,15 @@
       <h3>➕ Input Transaksi Harian</h3>
       <div class="form-grid">
         <div class="form-group"><label>Tanggal</label><input type="date" id="inTgl"></div>
-        <div class="form-group"><label>Ticket</label><input type="text" id="inTicket" placeholder="HT-001"></div>
-        <div class="form-group" style="grid-column:span 2;"><label>Barang</label><input type="text" id="inItem" list="dlAllItems" placeholder="🔍 Ketik cari kode / nama barang..."></div>
+        <div class="form-group"><label>Ticket</label><input type="text" id="inTicket" placeholder="HT-001" autocomplete="off"></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Barang</label><input type="text" id="inItem" list="dlAllItems" placeholder="🔍 Ketik cari kode / nama barang..." autocomplete="off"></div>
         <div class="form-group"><label>Jenis</label>
           <select id="inJenis">
             <option value="in">IN</option>
             <option value="out">OUT</option>
           </select>
         </div>
-        <div class="form-group"><label>QTY</label><input type="number" id="inQty" min="1" placeholder="0"></div>
+        <div class="form-group"><label>QTY</label><input type="number" id="inQty" min="1" placeholder="0" autocomplete="off"></div>
         <div class="form-group"><label>Gerai (Cabang)</label><select id="inGerai"></select></div>
         <div class="form-group"><button class="btn btn-primary" onclick="submitTrx()">Simpan</button></div>
       </div>
@@ -491,7 +491,7 @@
       <h3>👤 Manajemen User</h3>
       <div class="form-grid" style="margin-bottom:10px;">
         <div class="form-group"><label>Username</label><input type="text" id="newUser" placeholder="username"></div>
-        <div class="form-group"><label>Password</label><input type="password" id="newPass" placeholder="password"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="newPass" placeholder="password" autocomplete="new-password"></div>
         <div class="form-group"><label>Role</label>
           <select id="newRole">
             <option value="staff">Staff</option>
@@ -573,7 +573,7 @@
   <div class="modal-card">
     <h3>🔐 Login</h3>
     <div class="form-group"><label>Username</label><input type="text" id="loginUser" placeholder="admin"></div>
-    <div class="form-group"><label>Password</label><input type="password" id="loginPass" placeholder="••••••••"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
     <div class="flex">
       <button class="btn" onclick="hideLogin()">Batal</button>
       <button class="btn btn-primary" onclick="doLogin()">Masuk</button>
@@ -586,7 +586,7 @@
     <h3>👤 Edit Kredensial User</h3>
     <input type="hidden" id="editUserOldName">
     <div class="form-group"><label>Username Baru</label><input type="text" id="editUserNewName"></div>
-    <div class="form-group"><label>Password Baru</label><input type="password" id="editUserNewPass" placeholder="Kosongkan jika tidak ganti"></div>
+    <div class="form-group"><label>Password Baru</label><input type="password" id="editUserNewPass" placeholder="Kosongkan jika tidak ganti" autocomplete="new-password"></div>
     <div class="form-group"><label>Role</label>
       <select id="editUserRole">
         <option value="staff">Staff</option>
@@ -4056,5 +4056,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2763b6f69df7855',t:'MTc4NjEwNTE5Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2764d443d791982',t:'MTc4NjEwNTkyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
