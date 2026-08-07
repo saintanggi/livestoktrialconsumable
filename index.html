@@ -131,6 +131,7 @@
   
   /* Khusus Kolom Item agar Nama Panjang Tampil ke Samping Full & Tidak Melebar ke Bawah */
   .col-item { width: auto !important; min-width: 320px !important; white-space: nowrap !important; overflow: visible !important; text-overflow: clip !important; color: #fff !important; font-weight: 600 !important; font-size: 14px !important; }
+  .col-resi { width: 140px !important; font-family: monospace !important; }
 
   /* Pengaturan Lebar Kolom Lainnya */
   .col-no { width: 32px !important; text-align: center; padding-left: 2px; padding-right: 2px; }
@@ -1459,7 +1460,8 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
           out: String(row[7]),
           nama_gerai: row[8],
           keterangan: row[9],
-          user: row[10]
+          user: row[10],
+          no_resi: row[11] || '-'
         });
         error = err;
       } else if (action === 'update') {
@@ -1473,7 +1475,8 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
           out: String(row[7]),
           nama_gerai: row[8],
           keterangan: row[9],
-          user: row[10]
+          user: row[10],
+          no_resi: row[11] || '-'
         }).eq('id', id);
         error = err;
       } else if (action === 'delete') {
@@ -1517,7 +1520,8 @@ async function syncBulkToGAS(sheet, rows, skipQueue = false) {
         out: String(r[7]),
         nama_gerai: r[8],
         keterangan: r[9],
-        user: r[10]
+        user: r[10],
+        no_resi: r[11] || '-'
       }));
       const { error: err } = await supabaseClient.from('log_transaksi').upsert(dbRows);
       error = err;
@@ -1653,7 +1657,8 @@ async function pullData() {
       out: l.out,
       gerai: l.nama_gerai || '', // Dipetakan dari nama_gerai di database
       ket: l.keterangan || '',   // Dipetakan dari keterangan di database
-      user: l.user || 'System'
+      user: l.user || 'System',
+      no_resi: l.no_resi || '-' // Dipetakan dari no_resi di database
     }));
 
     // Map Gerai
@@ -2457,6 +2462,7 @@ function renderContent() {
       {key: 'checkbox', label: '<input type="checkbox" id="selectAllLogs" onclick="toggleSelectAllLogs(this)">', type: 'checkbox'},
       {key: 'tanggal', label: 'Tanggal', type: 'date_simple'},
       {key: 'ticket', label: 'Ticket', type: 'mono'},
+      {key: 'no_resi', label: 'No Resi', type: 'mono_resi'},
       {key: 'kode', label: 'Kode', type: 'mono'},
       {key: 'item', label: 'Barang', type: 'text'},
       {key: 'in', label: 'In', type: 'num_in_log'},
@@ -2472,6 +2478,7 @@ function renderContent() {
       {key: 'checkbox', label: '<input type="checkbox" id="selectAllLogs" onclick="toggleSelectAllLogs(this)">', type: 'checkbox'},
       {key: 'tanggal', label: 'Tanggal', type: 'date_simple'},
       {key: 'ticket', label: 'Ticket', type: 'mono'},
+      {key: 'no_resi', label: 'No Resi', type: 'mono_resi'},
       {key: 'kode', label: 'Kode', type: 'mono'},
       {key: 'item', label: 'Barang', type: 'text'},
       {key: 'status', label: 'Status', type: 'text'},
@@ -2538,6 +2545,7 @@ function renderContent() {
     else if (c.key === 'checkbox') thCls += ' col-checkbox';
     else if (c.key === 'tanggal') thCls += ' col-tanggal';
     else if (c.key === 'ticket') thCls += ' col-ticket';
+    else if (c.key === 'no_resi') thCls += ' col-resi';
     else if (c.key === 'in') thCls += ' col-in';
     else if (c.key === 'out') thCls += ' col-out';
     else if (c.key === 'gerai') thCls += ' col-gerai';
@@ -2564,6 +2572,7 @@ function renderContent() {
         else if (c.key === 'checkbox') tdCls += ' col-checkbox';
         else if (c.key === 'tanggal') tdCls += ' col-tanggal';
         else if (c.key === 'ticket') tdCls += ' col-ticket';
+        else if (c.key === 'no_resi') tdCls += ' col-resi';
         else if (c.key === 'in') tdCls += ' col-in';
         else if (c.key === 'out') tdCls += ' col-out';
         else if (c.key === 'gerai') tdCls += ' col-gerai';
@@ -2581,6 +2590,8 @@ function renderContent() {
           content = formatDateSimple(val); 
         } else if (c.type === 'mono') {
           content = '<span class="text-muted" style="font-family:monospace;">' + val + '</span>';
+        } else if (c.type === 'mono_resi') {
+          content = val && val !== '-' ? '<span style="font-family:monospace; font-weight:700; color:#58a6ff;">' + val + '</span>' : '<span class="text-muted">—</span>';
         } else if (c.type === 'status') {
           const badge = val || 'ok';
           content = '<span class="badge ' + badge + '"><span class="pulse-dot ' + badge + '"></span>' + getStatusText(r.buffer, r.akhir) + '</span>';
@@ -3126,7 +3137,7 @@ async function submitTrx() {
   data.logs.push({
     id, tanggal: tgl, ticket, kode,
     item: master.item, status: stat,
-    in: inVal, out: outVal, gerai, ket: '-', user: actor
+    in: inVal, out: outVal, gerai, ket: '-', user: actor, no_resi: '-'
   });
 
   recalculateStok();
@@ -3134,7 +3145,7 @@ async function submitTrx() {
   addAudit('INPUT_TRX', `Input transaksi ${jenis.toUpperCase()} (${qty}) ${kode} untuk gerai ${gerai}`);
   
   showToast('⏳ Menyimpan ke Cloud...', 'info');
-  const res = await syncToGAS('Log_Transaksi', [id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, '-', actor], 'append');
+  const res = await syncToGAS('Log_Transaksi', [id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, '-', actor, '-'], 'append');
   
   refreshAll();
   document.getElementById('inQty').value = '';
@@ -3180,11 +3191,11 @@ async function processTransfer() {
 
     logOut = {
       id: idOut, tanggal: tgl, ticket, kode: hoKode, item: hoStock.item, 
-      status: 'HO', in: '-', out: qty, gerai: 'INTERNAL', ket: 'Trf out ke AGEN | ' + ket, user: actor
+      status: 'HO', in: '-', out: qty, gerai: 'INTERNAL', ket: 'Trf out ke AGEN | ' + ket, user: actor, no_resi: '-'
     };
     logIn = {
       id: idIn, tanggal: tgl, ticket, kode: agenKode, item: agenStock.item, 
-      status: 'AGEN', in: qty, out: '-', gerai: 'INTERNAL', ket: 'Trf in dari HO | ' + ket, user: actor
+      status: 'AGEN', in: qty, out: '-', gerai: 'INTERNAL', ket: 'Trf in dari HO | ' + ket, user: actor, no_resi: '-'
     };
 
   } else { 
@@ -3192,11 +3203,11 @@ async function processTransfer() {
 
     logOut = {
       id: idOut, tanggal: tgl, ticket, kode: agenKode, item: agenStock.item, 
-      status: 'AGEN', in: '-', out: qty, gerai: 'INTERNAL', ket: 'Trf out ke HO | ' + ket, user: actor
+      status: 'AGEN', in: '-', out: qty, gerai: 'INTERNAL', ket: 'Trf out ke HO | ' + ket, user: actor, no_resi: '-'
     };
     logIn = {
       id: idIn, tanggal: tgl, ticket, kode: hoKode, item: hoStock.item, 
-      status: 'HO', in: qty, out: '-', gerai: 'INTERNAL', ket: 'Trf in dari AGEN | ' + ket, user: actor
+      status: 'HO', in: qty, out: '-', gerai: 'INTERNAL', ket: 'Trf in dari AGEN | ' + ket, user: actor, no_resi: '-'
     };
   }
 
@@ -3207,8 +3218,8 @@ async function processTransfer() {
   addAudit('TRANSFER_STOK', `Transfer stok ${arah} sebanyak ${qty} (Tiket: ${ticket})`);
   
   const rowsToSync = [
-    [logOut.id, logOut.tanggal, logOut.ticket, logOut.kode, logOut.item, logOut.status, logOut.in, logOut.out, logOut.gerai, logOut.ket, logOut.user],
-    [logIn.id, logIn.tanggal, logIn.ticket, logIn.kode, logIn.item, logIn.status, logIn.in, logIn.out, logIn.gerai, logIn.ket, logIn.user]
+    [logOut.id, logOut.tanggal, logOut.ticket, logOut.kode, logOut.item, logOut.status, logOut.in, logOut.out, logOut.gerai, logOut.ket, logOut.user, '-'],
+    [logIn.id, logIn.tanggal, logIn.ticket, logIn.kode, logIn.item, logIn.status, logIn.in, logIn.out, logIn.gerai, logIn.ket, logIn.user, '-']
   ];
   
   showToast('⏳ Menyimpan Transfer di Cloud...', 'info');
@@ -3257,7 +3268,7 @@ async function processOpname() {
   data.logs.push({
     id, tanggal: tgl, ticket: 'OPN-' + Date.now().toString().slice(-6),
     kode, item: master.item, status: stat,
-    in: inVal, out: outVal, gerai: 'OPNAME', ket: 'Fisik(' + fisik + ') | ' + ket, user: actor
+    in: inVal, out: outVal, gerai: 'OPNAME', ket: 'Fisik(' + fisik + ') | ' + ket, user: actor, no_resi: '-'
   });
 
   recalculateStok();
@@ -3265,7 +3276,7 @@ async function processOpname() {
   addAudit('OPNAME', `Stok Opname ${kode} fisik: ${fisik} (Selisih: ${selisih})`);
   
   showToast('⏳ Menyimpan Opname di Cloud...', 'info');
-  const res = await syncToGAS('Log_Transaksi', [id, tgl, 'OPN-' + Date.now().toString().slice(-6), kode, master.item, stat, inVal, outVal, 'OPNAME', ket, actor], 'append');
+  const res = await syncToGAS('Log_Transaksi', [id, tgl, 'OPN-' + Date.now().toString().slice(-6), kode, master.item, stat, inVal, outVal, 'OPNAME', ket, actor, '-'], 'append');
   
   refreshAll();
   document.getElementById('opnFisik').value = '';
@@ -3774,7 +3785,9 @@ async function processResiSync() {
       if (json.length < 2) { showToast('File kosong!', 'error'); return; }
 
       let matchCount = 0;
+      let insertCount = 0;
       let syncQueue = [];
+      const actor = currentUser ? currentUser.username : 'System';
 
       for (let i = 1; i < json.length; i++) {
         const r = json[i];
@@ -3782,7 +3795,11 @@ async function processResiSync() {
 
         const ticketNum = r[1] ? String(r[1]).trim() : '';
         const barangNameRaw = r[6] ? String(r[6]).trim() : '';
+        const qtyApproved = parseInt(r[10]) || 0; // Menggunakan QTY Approved sebagai jumlah pengeluaran OUT
         const nomorResi = r[15] ? String(r[15]).trim() : '';
+        const createDateRaw = r[21] ? String(r[21]).trim() : '';
+        const cabangGerai = r[2] ? String(r[2]).trim() : 'Kantor Pusat';
+        const ketDetail = r[18] ? String(r[18]).trim() : 'Sinkronisasi Resi Otomatis';
 
         // Filter baris kosong atau tidak valid (Nomor tiket harus dimulai dengan 'HT' dan No Resi harus terisi)
         if (!ticketNum.startsWith('HT') || !nomorResi || nomorResi === '-') continue;
@@ -3791,7 +3808,7 @@ async function processResiSync() {
         const matchedLogs = data.logs.filter(l => {
           const isTicketMatch = String(l.ticket).trim() === ticketNum;
           
-          // Penormalan pencarian nama barang parsial (agar 'LAKBAN (BENING)' di CSV cocok dengan 'LAKBAN (BENING)' di DB)
+          // Penormalan pencarian nama barang parsial
           const cleanLName = l.item.toLowerCase().replace(/[^a-z0-9]/g, '');
           const cleanBName = barangNameRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
           const isNameMatch = cleanLName.includes(cleanBName) || cleanBName.includes(cleanLName);
@@ -3799,61 +3816,87 @@ async function processResiSync() {
           return isTicketMatch && isNameMatch;
         });
 
-        for (let l of matchedLogs) {
-          // Jika sudah berisi resi tersebut, lewati agar tidak menulis ganda
-          if (l.ket.includes(nomorResi)) continue;
+        if (matchedLogs.length > 0) {
+          // A. JIKA DITEMUKAN DATA YANG COCOK: Update nomor resinya!
+          for (let l of matchedLogs) {
+            if (l.no_resi === nomorResi) continue; // Sudah tersinkronisasi, lewati
 
-          // Suntikkan No Resi ke dalam kolom keterangan log transaksi
-          let newKet = l.ket && l.ket !== '-' ? `${l.ket} | RESI: ${nomorResi}` : `RESI: ${nomorResi}`;
-          l.ket = newKet;
-
-          // Tambahkan ke antrean sinkronisasi
-          syncQueue.push({
-            id: l.id,
-            tanggal: l.tanggal,
-            ticket: l.ticket,
-            kode: l.kode,
-            item: l.item,
-            status: l.status,
-            in: l.in,
-            out: l.out,
-            gerai: l.gerai,
-            ket: newKet,
-            user: l.user
+            l.no_resi = nomorResi;
+            syncQueue.push({
+              action: 'update',
+              id: l.id,
+              row: [l.id, l.tanggal, l.ticket, l.kode, l.item, l.status, l.in, l.out, l.gerai, l.ket, l.user, l.no_resi]
+            });
+            matchCount++;
+          }
+        } else {
+          // B. JIKA TIDAK DITEMUKAN (BELUM TERINPUT): Buat transaksi OUT baru secara otomatis!
+          // Cari master barang yang cocok dengan nama barang dari CSV
+          const matchedMaster = data.master.find(m => {
+            const cleanMName = m.item.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanBName = barangNameRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return cleanMName.includes(cleanBName) || cleanBName.includes(cleanMName);
           });
 
-          matchCount++;
+          if (matchedMaster && qtyApproved > 0) {
+            const id = 'log_auto_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+            // Format tanggal dari "8/6/2026 11:47" ke "2026-08-06"
+            const tanggalIso = excelDateToISO(createDateRaw.split(' ')[0]);
+
+            const newLog = {
+              id,
+              tanggal: tanggalIso,
+              ticket: ticketNum,
+              kode: matchedMaster.kode,
+              item: matchedMaster.item,
+              status: matchedMaster.status,
+              in: '-',
+              out: qtyApproved,
+              gerai: cabangGerai,
+              ket: ketDetail,
+              user: actor,
+              no_resi: nomorResi
+            };
+
+            // Tambahkan ke log lokal
+            data.logs.push(newLog);
+
+            // Tambahkan ke antrean sinkronisasi Supabase
+            syncQueue.push({
+              action: 'append',
+              id: id,
+              row: [id, tanggalIso, ticketNum, matchedMaster.kode, matchedMaster.item, matchedMaster.status, '-', qtyApproved, cabangGerai, ketDetail, actor, nomorResi]
+            });
+
+            insertCount++;
+          }
         }
       }
 
-      if (matchCount === 0) {
-        showToast('ℹ️ Tidak ada transaksi baru yang cocok untuk disinkronkan nomor resinya.', 'info');
+      const totalActions = matchCount + insertCount;
+      if (totalActions === 0) {
+        showToast('ℹ️ Tidak ada data baru untuk dicocokkan atau diinput.', 'info');
         setStatus('online', 'ONLINE');
         fileInput.value = '';
         document.getElementById('fileResiName').textContent = 'Belum ada file dipilih';
         return;
       }
 
-      showToast(`⏳ Menyinkronkan ${matchCount} nomor resi ke Supabase...`, 'info');
+      showToast(`⏳ Sinkronisasi ${totalActions} data ke Supabase (Cocok: ${matchCount}, Input Baru: ${insertCount})...`, 'info');
       
-      // Kirim pembaruan ke cloud Supabase satu per satu atau via outbox
-      for (let item of syncQueue) {
-        // Cari baris index log asli untuk diupdate lokal
-        const originalIdx = data.logs.findIndex(x => x.id === item.id);
-        if (originalIdx !== -1) {
-          data.logs[originalIdx].ket = item.ket;
-        }
-        await syncToGAS('Log_Transaksi', [item.id, item.tanggal, item.ticket, item.kode, item.item, item.status, item.in, item.out, item.gerai, item.ket, item.user], 'update', item.id);
+      // Kirim pembaruan ke cloud Supabase
+      for (let op of syncQueue) {
+        await syncToGAS('Log_Transaksi', op.row, op.action, op.id);
       }
 
       recalculateStok();
       saveData();
-      addAudit('RESI_SYNC', `Sinkronisasi massal otomatis ${matchCount} nomor resi via file laporan kantor`);
+      addAudit('RESI_SYNC_AUTO', `Pencocokan resi selesai: ${matchCount} di-update, ${insertCount} di-input baru secara otomatis`);
       refreshAll();
 
       fileInput.value = '';
       document.getElementById('fileResiName').textContent = 'Belum ada file dipilih';
-      showToast(`✅ Sukses! ${matchCount} nomor resi berhasil dicocokkan & disinkronkan otomatis!`, 'success');
+      showToast(`✅ Sukses besar! ${matchCount} No Resi diperbarui & ${insertCount} Transaksi baru diinput otomatis!`, 'success');
       setStatus('online', 'ONLINE');
 
     } catch (err) {
