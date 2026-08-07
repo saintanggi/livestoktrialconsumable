@@ -3441,7 +3441,16 @@ async function processBulk() {
 
       for (let i = 1; i < json.length; i++) {
         const r = json[i];
+        if (!r || r.length < 5) continue;
+        const tgl = excelDateToISO(r[0]);
+        const ticket = r[1] ? String(r[1]).trim() : 'BULK-' + Date.now().toString().slice(-6);
+        const kode = String(r[2] || '').trim();
+        const jenis = String(r[3] || 'out').toLowerCase();
+        const qty = Number(r[4]) || 0;
+        const gerai = String(r[5] || 'Gerai Utama');
+        const ket = String(r[6] || 'Upload Massal');
 
+        if (!kode || qty <= 0) continue;
 
         // --- FITUR ANTI-DOUBLE UPLOAD (DEDUPLIKASI) ---
         // Jika transaksi dengan Tanggal, No Tiket, Kode Barang, dan QTY yang sama sudah ada, LEWATI otomatis!
@@ -3456,16 +3465,7 @@ async function processBulk() {
           duplicateCount++;
           continue; // Lewati baris duplikat ini!
         }
-        if (!r || r.length < 5) continue;
-        const tgl = excelDateToISO(r[0]);
-        const ticket = r[1] ? String(r[1]).trim() : 'BULK-' + Date.now().toString().slice(-6);
-        const kode = String(r[2] || '').trim();
-        const jenis = String(r[3] || 'out').toLowerCase();
-        const qty = Number(r[4]) || 0;
-        const gerai = String(r[5] || 'Gerai Utama');
-        const ket = String(r[6] || 'Upload Massal');
 
-        if (!kode || qty <= 0) continue;
         const master = data.master.find(m => m.kode === kode);
         if (!master) continue;
 
@@ -4056,5 +4056,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2762f927e33e77a',t:'MTc4NjEwNDcwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2763b6f69df7855',t:'MTc4NjEwNTE5Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
