@@ -492,6 +492,13 @@
         </div>
       </div>
 
+      <!-- ALAT PEMELIHARAAN DATABASE (CLEAN-UP) -->
+      <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #30363d;">
+        <span style="font-size: 11px; font-weight: bold; color: #ff6b6b; text-transform: uppercase; letter-spacing: 0.8px;">⚙️ Pemeliharaan Database (Admin):</span>
+        <p style="font-size: 12px; color: #8b949e; margin-top: 4px; margin-bottom: 8px;">Ditemukan input ganda akibat proses upload lama? Gunakan tombol di bawah untuk mendeteksi dan menghapus semua baris duplikat secara otomatis dari cloud Supabase.</p>
+        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="cleanDuplicateLogs()">🗑️ Bersihkan Seluruh Transaksi Ganda (Duplikat)</button>
+      </div>
+
       <!-- KATEGORI 2: SINKRONISASI NO RESI OTOMATIS -->
       <div class="upload-section hidden" id="uploadSecResi">
         <p>Unggah file laporan resi kantor (format CSV/Excel) untuk mencocokkan nomor tiket & nama barang secara otomatis dan menyuntikkan Nomor Resi langsung ke log transaksi tanpa perlu ketik 1 per 1.</p>
@@ -1512,7 +1519,7 @@ async function syncBulkToGAS(sheet, rows, skipQueue = false) {
         keterangan: r[9],
         user: r[10]
       }));
-      const { error: err } = await supabaseClient.from('log_transaksi').insert(dbRows);
+      const { error: err } = await supabaseClient.from('log_transaksi').upsert(dbRows);
       error = err;
     }
 
@@ -3527,6 +3534,8 @@ async function processBulk() {
       let simulatedStockMap = {}; // keep track of stock levels during calculation
       let duplicateCount = 0;
 
+      let replaceCount = 0;
+
       for (let i = 1; i < json.length; i++) {
         const r = json[i];
         if (!r || r.length < 5) continue;
@@ -3539,20 +3548,6 @@ async function processBulk() {
         const ket = String(r[6] || 'Upload Massal');
 
         if (!kode || qty <= 0) continue;
-
-        // --- FITUR ANTI-DOUBLE UPLOAD (DEDUPLIKASI) ---
-        // Jika transaksi dengan Tanggal, No Tiket, Kode Barang, dan QTY yang sama sudah ada, LEWATI otomatis!
-        const isDuplicate = data.logs.some(l => 
-          formatYMD(l.tanggal) === formatYMD(tgl) && 
-          String(l.ticket).trim() === ticket && 
-          String(l.kode).trim() === kode &&
-          ((jenis === 'in' && num(l.in) === qty) || (jenis === 'out' && num(l.out) === qty))
-        );
-
-        if (isDuplicate) {
-          duplicateCount++;
-          continue; // Lewati baris duplikat ini!
-        }
 
         const master = data.master.find(m => m.kode === kode);
         if (!master) continue;
@@ -3567,6 +3562,48 @@ async function processBulk() {
           simulatedStockMap[kode] = stock.akhir;
         }
 
+        const inVal = jenis === 'in' ? qty : '-';
+        const outVal = jenis === 'out' ? qty : '-';
+
+        // --- FITUR AUTO-REPLACE (UPSERT) ---
+        // Cari apakah transaksi dengan Tanggal, No Tiket, dan Kode Barang yang sama sudah ada di database
+        const existingIdx = data.logs.findIndex(l => 
+          formatYMD(l.tanggal) === formatYMD(tgl) && 
+          String(l.ticket).trim() === ticket && 
+          String(l.kode).trim() === kode
+        );
+
+        let id;
+        if (existingIdx !== -1) {
+          // Jika ada duplikat: Timpa lokal & gunakan ID yang sama agar Supabase meng-update datanya (UPSERT)
+          const oldLog = data.logs[existingIdx];
+          id = oldLog.id;
+          
+          // Kurangi stok lama sebelum ditimpa dengan stok baru
+          stock.akhir -= num(oldLog.in);
+          stock.akhir += num(oldLog.out);
+
+          data.logs[existingIdx] = {
+            id, tanggal: tgl, ticket, kode,
+            item: master.item, status: stat,
+            in: inVal, out: outVal, gerai, ket, user: actor
+          };
+          replaceCount++;
+        } else {
+          // Jika tidak ada duplikat: Buat log baru
+          id = genId();
+          data.logs.push({
+            id, tanggal: tgl, ticket, kode,
+            item: master.item, status: stat,
+            in: inVal, out: outVal, gerai, ket, user: actor
+          });
+          count++;
+        }
+
+        // Terapkan penambahan/pengurangan stok yang baru ke stok akhir
+        stock.akhir += num(inVal);
+        stock.akhir -= num(outVal);
+
         if (jenis === 'out') {
           if (simulatedStockMap[kode] - qty < 0) {
             warningItems.push(`${kode} (${master.item}): Stok ${simulatedStockMap[kode]}, Mutasi OUT: ${qty}`);
@@ -3576,17 +3613,7 @@ async function processBulk() {
           simulatedStockMap[kode] += qty;
         }
 
-        const id = genId();
-        const inVal = jenis === 'in' ? qty : '-';
-        const outVal = jenis === 'out' ? qty : '-';
-
-        data.logs.push({
-          id, tanggal: tgl, ticket, kode,
-          item: master.item, status: stat,
-          in: inVal, out: outVal, gerai, ket, user: actor
-        });
         rowsToSync.push([id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, ket, actor]);
-        count++;
       }
 
       if (warningItems.length > 0) {
@@ -3615,10 +3642,10 @@ async function processBulk() {
       refreshAll();
       fileInput.value = '';
       document.getElementById('fileName').textContent = 'Belum ada file';
-      if (duplicateCount > 0) {
-        showToast(`✅ Berhasil mengimpor ${count} data baru. (${duplicateCount} data duplikat dilewati otomatis agar tidak double!)`, 'success');
+      if (replaceCount > 0) {
+        showToast(`✅ Berhasil memproses: ${count} data baru diimpor, dan ${replaceCount} data lama di-update/ditimpa secara otomatis!`, 'success');
       } else {
-        showToast('✅ ' + count + ' transaksi berhasil diimport!', 'success');
+        showToast(`✅ ${count} transaksi baru berhasil diimport!`, 'success');
       }
     } catch(err) {
       showToast('❌ Gagal: ' + err.message, 'error');
@@ -3836,6 +3863,63 @@ async function processResiSync() {
     }
   };
   reader.readAsArrayBuffer(fileInput.files[0]);
+}
+
+async function cleanDuplicateLogs() {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  
+  showToast('🔍 Memindai database untuk mencari data ganda...', 'info');
+  
+  const seen = new Set();
+  const duplicateIds = [];
+  const poTotals = calculatePoTotals();
+
+  // Urutkan dari terlama ke terbaru agar data pertama yang kita pertahankan adalah yang asli
+  const sortedLogs = [...data.logs].reverse();
+
+  sortedLogs.forEach(l => {
+    // Kunci unik untuk mendeteksi duplikat identik
+    const key = `${formatYMD(l.tanggal)}_${String(l.ticket).trim()}_${String(l.kode).trim()}_${l.in}_${l.out}_${String(l.gerai).trim()}`;
+    if (seen.has(key)) {
+      duplicateIds.push(l.id);
+    } else {
+      seen.add(key);
+    }
+  });
+
+  if (duplicateIds.length === 0) {
+    showToast('✅ Hebat! Database Anda sudah bersih, tidak ditemukan transaksi ganda.', 'success');
+    return;
+  }
+
+  const confirmClean = confirm(`⚠️ DETEKSI SUKSES!\n\nDitemukan sebanyak ${duplicateIds.length} transaksi ganda (duplikat) di database Anda akibat proses upload lama.\n\nApakah Anda yakin ingin menghapus ${duplicateIds.length} baris ganda ini secara otomatis dari Supabase untuk memperbaiki laporan stok?`);
+  if (!confirmClean) return;
+
+  setStatus('syncing', 'CLEANING...');
+  showToast(`⏳ Menghapus ${duplicateIds.length} baris ganda dari Supabase...`, 'info');
+
+  try {
+    // Hapus dari memori lokal
+    data.logs = data.logs.filter(l => !duplicateIds.includes(l.id));
+    
+    // Kirim perintah hapus massal ke Supabase
+    const res = await syncBulkDeleteToGAS('Log_Transaksi', duplicateIds);
+    
+    recalculateStok();
+    saveData();
+    addAudit('DATABASE_CLEANUP', `Membersihkan ${duplicateIds.length} baris transaksi ganda otomatis`);
+    refreshAll();
+
+    if (res && res.isOffline) {
+      showToast('⚠️ Offline: Pembersihan dicatat lokal & masuk antrean sinkronisasi!', 'warn');
+    } else {
+      showToast(`✅ Sukses besar! ${duplicateIds.length} data transaksi ganda berhasil dibersihkan!`, 'success');
+    }
+  } catch (err) {
+    console.error('Cleanup failed:', err);
+    showToast('❌ Gagal membersihkan data ganda: ' + err.message, 'error');
+  }
+  setStatus('online', 'ONLINE');
 }
 
 function calculatePoTotals() {
