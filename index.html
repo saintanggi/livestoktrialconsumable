@@ -1047,16 +1047,55 @@ function formatExcelDate(dateStr) {
 
 function excelDateToISO(serial) {
   if (!serial) return new Date().toISOString().split('T')[0];
+  
+  let s = String(serial).trim();
+  
+  // 1. Jika sudah dalam format standar ISO YYYY-MM-DD
+  if (s.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return s;
+  }
+  
+  // 2. Pemisahan manual jika formatnya adalah M/D/YYYY atau D/M/YYYY (seperti 8/6/2026)
+  const parts = s.split(/[\/\-\.]/);
+  if (parts.length === 3) {
+    let p1 = parseInt(parts[0]);
+    let p2 = parseInt(parts[1]);
+    let p3 = parseInt(parts[2]);
+    
+    if (p3 > 1000) { // Format diakhiri tahun (misal: 8/6/2026 atau 08-06-2026)
+      let year = p3;
+      let month = p1;
+      let day = p2;
+      
+      // Jika angka pertama lebih dari 12, berarti formatnya adalah DD/MM/YYYY
+      if (p1 > 12) {
+        day = p1;
+        month = p2;
+      } else {
+        // Fallback standar: sesuaikan dengan data masukan tanggal riil Anda (8/6 adalah 6 Agustus)
+        // Jika p1 adalah 8 (Agustus) dan p2 adalah 6 (tanggal 6), maka Month = p1, Day = p2.
+        month = p1;
+        day = p2;
+      }
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    } else if (p1 > 1000) { // Format diawali tahun (misal: 2026/08/06)
+      return `${p1}-${String(p2).padStart(2, '0')}-${String(p3).padStart(2, '0')}`;
+    }
+  }
+
+  // 3. Fallback ke sistem parser bawaan JavaScript
   if (isNaN(serial)) {
-    let parsed = new Date(serial);
+    let parsed = new Date(s);
     if (!isNaN(parsed.getTime())) {
       const y = parsed.getFullYear();
       const m = String(parsed.getMonth() + 1).padStart(2, '0');
       const d = String(parsed.getDate()).padStart(2, '0');
       return `${y}-${m}-${d}`;
     }
-    return String(serial).trim();
+    return s;
   }
+  
+  // 4. Hitung dari Serial Number Excel asli
   const utc_days = Math.floor(serial - 25569);
   const utc_value = utc_days * 86400;
   const date_info = new Date(utc_value * 1000);
@@ -4017,5 +4056,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27616c3e892a2a7',t:'MTc4NjEwMzY5MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2762f927e33e77a',t:'MTc4NjEwNDcwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
