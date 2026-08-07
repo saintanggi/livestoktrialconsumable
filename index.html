@@ -320,6 +320,7 @@
           <div class="form-group"><label>Tanggal Penerimaan</label><input type="date" id="poDeliveryTgl"></div>
           <div class="form-group"><label>No Surat Jalan (SJ)</label><input type="text" id="poDeliveryNoSj" placeholder="Contoh: SJ-99882"></div>
           <div class="form-group"><label>QTY Masuk (Parsial)</label><input type="number" id="poDeliveryQty" min="1" placeholder="0"></div>
+          <div class="form-group" style="grid-column: span 2;"><label>📷 Unggah Foto Surat Jalan (Bukti Fisik)</label><input type="file" id="poDeliveryFile" accept="image/*,application/pdf"></div>
           <div class="form-group" style="grid-column: span 2;"><label>Keterangan Penerimaan</label><input type="text" id="poDeliveryKet" placeholder="Keterangan tambahan (misal: Sisa kiriman menyusul)"></div>
           <div class="form-group" style="justify-content: flex-end;"><button class="btn btn-primary" onclick="submitPoDelivery()">Proses Penerimaan</button></div>
         </div>
@@ -350,6 +351,7 @@
                 <th>GUDANG</th>
                 <th class="text-right">QTY MASUK</th>
                 <th>PENERIMA</th>
+                <th>BUKTI FOTO</th>
                 <th>KETERANGAN</th>
                 <th>AKSI</th>
               </tr>
@@ -611,6 +613,19 @@
     <div class="flex">
       <button class="btn" onclick="hideEditLog()">Batal</button>
       <button class="btn btn-primary" onclick="saveEditLog()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="viewFotoModal">
+  <div class="modal-card" style="max-width: 600px; width: 90%;">
+    <h3>📷 Bukti Foto Surat Jalan</h3>
+    <div style="text-align: center; margin-top: 10px; background: #0d1117; padding: 10px; border-radius: 6px; border: 1px solid #30363d;">
+      <img id="viewFotoImg" src="" alt="Bukti Surat Jalan" style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 4px;">
+    </div>
+    <div class="flex" style="margin-top: 12px; justify-content: flex-end;">
+      <a id="downloadFotoBtn" class="btn" href="" target="_blank" style="color: #3fb950; border-color: #3fb950;">📥 Download Gambar</a>
+      <button class="btn" onclick="hideViewFoto()">Tutup</button>
     </div>
   </div>
 </div>
@@ -925,6 +940,7 @@ document.addEventListener('DOMContentLoaded', function() {
       hideEditUser();
       hideEditLog();
       hideEditMaster();
+      hideViewFoto();
     }
   });
 });
@@ -1284,7 +1300,8 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
           no_sj: row[3],
           qty_masuk: parseInt(row[4]) || 0,
           keterangan: row[5],
-          user_penerima: row[6]
+          user_penerima: row[6],
+          foto_sj_url: row[7] || '-'
         });
         error = err;
       } else if (action === 'delete') {
@@ -1468,7 +1485,8 @@ async function pullData() {
         no_sj: d.no_sj,
         qty_masuk: parseInt(d.qty_masuk) || 0,
         keterangan: d.keterangan || '-',
-        user_penerima: d.user_penerima || 'System'
+        user_penerima: d.user_penerima || 'System',
+        foto_sj_url: d.foto_sj_url || '-'
       }));
     }
 
@@ -2759,6 +2777,7 @@ async function saveEditMaster() {
   }
 
   hideEditMaster();
+      hideViewFoto();
   refreshAll();
 }
 
@@ -3485,6 +3504,47 @@ function switchPoTab(tab) {
   }
 }
 
+// --- FOTO SURAT JALAN UPLOAD & VIEW HELPERS ---
+async function uploadFotoSj(file, fileName) {
+  if (typeof SUPABASE_URL === 'undefined' || !supabaseClient) {
+    throw new Error('Supabase belum terkonfigurasi');
+  }
+  const url = `${SUPABASE_URL}/storage/v1/object/surat-jalan/${fileName}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': file.type
+    },
+    body: file
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.message || 'Gagal mengunggah foto');
+  }
+  // Ambil URL Publik
+  return `${SUPABASE_URL}/storage/v1/object/public/surat-jalan/${fileName}`;
+}
+
+function viewFotoSj(url) {
+  const modal = document.getElementById('viewFotoModal');
+  const img = document.getElementById('viewFotoImg');
+  const downloadBtn = document.getElementById('downloadFotoBtn');
+  if (modal && img) {
+    img.src = url;
+    if (downloadBtn) {
+      downloadBtn.href = url;
+    }
+    modal.classList.add('active');
+  }
+}
+
+function hideViewFoto() {
+  const modal = document.getElementById('viewFotoModal');
+  if (modal) modal.classList.remove('active');
+}
+
 function calculatePoTotals() {
   // Hitung total QTY Masuk untuk setiap PO berdasarkan po_deliveries
   const poTotals = {};
@@ -3550,6 +3610,11 @@ function renderPoHistory() {
         <td><span class="badge ${po.gudang === 'HO' ? 'ok' : 'warn'}">${po.gudang || '—'}</span></td>
         <td class="text-right text-success" style="font-weight:700;">+${fmt(d.qty_masuk)}</td>
         <td><span class="badge warn" style="font-size:9px;">${d.user_penerima || 'System'}</span></td>
+        <td>
+          ${d.foto_sj_url && d.foto_sj_url !== '-' ? `
+            <button class="btn" style="padding:2px 6px; font-size:10px; color:#58a6ff; border-color:#58a6ff;" onclick="viewFotoSj('${d.foto_sj_url}')">📷 Lihat Foto</button>
+          ` : '<span class="text-muted">— No Foto</span>'}
+        </td>
         <td class="text-muted">${d.keterangan || '-'}</td>
         <td>
           <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deletePoDelivery('${d.id}')">🗑️ Hapus</button>
@@ -3702,6 +3767,25 @@ async function submitPoDelivery() {
   const deliveryId = 'del_' + Date.now();
   const actor = currentUser ? currentUser.username : 'System';
 
+  // 0. Proses Unggah Foto (jika ada file dipilih)
+  let fotoUrl = '-';
+  const fileInput = document.getElementById('poDeliveryFile');
+  if (fileInput && fileInput.files && fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    const extension = file.name.split('.').pop() || 'jpg';
+    const fileName = `sj_${noSj}_${Date.now()}.${extension}`;
+    
+    showToast('⏳ Mengunggah foto Surat Jalan...', 'info');
+    try {
+      fotoUrl = await uploadFotoSj(file, fileName);
+      showToast('✅ Foto Surat Jalan sukses diunggah!', 'success');
+    } catch (err) {
+      console.error('File upload failed:', err);
+      const proceed = confirm(`⚠️ Gagal mengunggah foto bukti: ${err.message}.\n\nApakah Anda ingin tetap menyimpan data penerimaan barang tanpa foto?`);
+      if (!proceed) return;
+    }
+  }
+
   const newDelivery = {
     id: deliveryId,
     no_po: noPo,
@@ -3709,7 +3793,8 @@ async function submitPoDelivery() {
     no_sj: noSj,
     qty_masuk: qty,
     keterangan: ket,
-    user_penerima: actor
+    user_penerima: actor,
+    foto_sj_url: fotoUrl
   };
 
   // 1. Simpan pengiriman parsial
@@ -3738,7 +3823,7 @@ async function submitPoDelivery() {
 
   showToast('⏳ Menyimpan Penerimaan di Cloud...', 'info');
   // Sinkronkan ke tabel "po_deliveries" di Supabase
-  const res1 = await syncToGAS('po_deliveries', [deliveryId, noPo, tgl, noSj, qty, ket, actor], 'append');
+  const res1 = await syncToGAS('po_deliveries', [deliveryId, noPo, tgl, noSj, qty, ket, actor, fotoUrl], 'append');
   // Sinkronkan ke tabel "log_transaksi" di Supabase secara otomatis!
   const res2 = await syncToGAS('Log_Transaksi', [trxId, tgl, noSj, p.kode_barang, p.nama_barang, p.gudang, qty, '-', `VENDOR (${p.nama_vendor})`, `Penerimaan Parsial PO: ${p.no_po} | ${ket}`, actor], 'append');
 
@@ -3746,6 +3831,9 @@ async function submitPoDelivery() {
   document.getElementById('poDeliveryNoSj').value = '';
   document.getElementById('poDeliveryQty').value = '';
   document.getElementById('poDeliveryKet').value = '';
+  if (document.getElementById('poDeliveryFile')) {
+    document.getElementById('poDeliveryFile').value = '';
+  }
 
   switchPoTab('history');
 
@@ -3903,5 +3991,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a274e8008b31e78b',t:'MTc4NjA5MTI4OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a274f421380a70ac',t:'MTc4NjA5MTc4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
