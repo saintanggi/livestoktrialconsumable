@@ -532,11 +532,106 @@
 <script>
 // --- KONFIGURASI SUPABASE ---
 // Silakan ganti dengan URL dan ANON KEY dari dasbor proyek Supabase Anda
-const SUPABASE_URL = "https://qdljeibmnolizjprignz.supabaseClient.co";
+const SUPABASE_URL = "https://qdljeibmnolizjprignz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbGplaWJtbm9saXpqcHJpZ256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjcyMDEsImV4cCI6MjEwMTYwMzIwMX0.Z7Gw29C8r8fbg-FcvGVGsBUw1Drt6FXqMmYsVkkSjHk";
 
 // Inisialisasi Supabase Client
-const supabaseClient = (typeof window.supabase !== 'undefined') ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+// --- LIGHTWEIGHT REST CLIENT FOR SUPABASE (BYPASS FIREWALL & ANTIVIRUS) ---
+// Menggunakan query string ?apikey=... untuk menghindari pemblokiran custom header oleh Antivirus/Firewall IT.
+const supabaseRest = {
+  from: (table) => {
+    const baseUrl = `${SUPABASE_URL}/rest/v1/${table}`;
+    const apikey = SUPABASE_ANON_KEY;
+    let method = 'GET';
+    let bodyData = null;
+    let matchField = null;
+    let matchValue = null;
+    let orderParam = null;
+    let selectParam = '*';
+    let inArray = null;
+
+    const builder = {
+      select: (query = '*') => {
+        method = 'GET';
+        selectParam = query;
+        return builder;
+      },
+      insert: (row) => {
+        method = 'POST';
+        bodyData = row;
+        return builder;
+      },
+      update: (row) => {
+        method = 'PATCH';
+        bodyData = row;
+        return builder;
+      },
+      delete: () => {
+        method = 'DELETE';
+        return builder;
+      },
+      order: (field, { ascending } = { ascending: true }) => {
+        orderParam = `${field}.${ascending ? 'asc' : 'desc'}`;
+        return builder;
+      },
+      eq: (field, value) => {
+        matchField = field;
+        matchValue = value;
+        return builder;
+      },
+      in: (field, valuesArray) => {
+        matchField = field;
+        inArray = valuesArray;
+        return builder;
+      },
+      // Membuat objek ini 'Thenable' agar bisa di-await secara langsung seperti Promise asli
+      then: async (resolve, reject) => {
+        try {
+          let url = `${baseUrl}?apikey=${apikey}`;
+          if (method === 'GET') {
+            url += `&select=${selectParam}`;
+            if (orderParam) url += `&order=${orderParam}`;
+          }
+          if (matchField) {
+            if (inArray) {
+              url += `&${matchField}=in.(${inArray.join(',')})`;
+            } else {
+              url += `&${matchField}=eq.${matchValue}`;
+            }
+          }
+
+          const response = await fetch(url, {
+            method: method,
+            headers: {
+              'Content-Type': 'application/json',
+              'Prefer': method === 'POST' ? 'return=representation' : ''
+            },
+            body: bodyData ? JSON.stringify(bodyData) : null
+          });
+
+          if (!response.ok) {
+            const err = await response.json();
+            throw err;
+          }
+
+          let resData = null;
+          if (method === 'GET') {
+            resData = await response.json();
+          }
+
+          resolve({ data: resData, error: null });
+        } catch (error) {
+          console.error('Supabase REST helper error:', error);
+          resolve({ data: null, error: error });
+        }
+      }
+    };
+
+    return builder;
+  }
+};
+
+const supabaseClient = supabaseRest;
 
 let currentPage = 1;
 
@@ -3281,5 +3376,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2737bc35dd162b7',t:'MTc4NjA3NjM3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27440065bf2b882',t:'MTc4NjA4NDQwOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
