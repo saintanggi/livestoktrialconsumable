@@ -3392,9 +3392,25 @@ async function processBulk() {
 
       let warningItems = [];
       let simulatedStockMap = {}; // keep track of stock levels during calculation
+      let duplicateCount = 0;
 
       for (let i = 1; i < json.length; i++) {
         const r = json[i];
+
+
+        // --- FITUR ANTI-DOUBLE UPLOAD (DEDUPLIKASI) ---
+        // Jika transaksi dengan Tanggal, No Tiket, Kode Barang, dan QTY yang sama sudah ada, LEWATI otomatis!
+        const isDuplicate = data.logs.some(l => 
+          formatYMD(l.tanggal) === formatYMD(tgl) && 
+          String(l.ticket).trim() === ticket && 
+          String(l.kode).trim() === kode &&
+          ((jenis === 'in' && num(l.in) === qty) || (jenis === 'out' && num(l.out) === qty))
+        );
+
+        if (isDuplicate) {
+          duplicateCount++;
+          continue; // Lewati baris duplikat ini!
+        }
         if (!r || r.length < 5) continue;
         const tgl = excelDateToISO(r[0]);
         const ticket = r[1] ? String(r[1]).trim() : 'BULK-' + Date.now().toString().slice(-6);
@@ -3466,7 +3482,11 @@ async function processBulk() {
       refreshAll();
       fileInput.value = '';
       document.getElementById('fileName').textContent = 'Belum ada file';
-      showToast('✅ ' + count + ' transaksi berhasil diimport!', 'success');
+      if (duplicateCount > 0) {
+        showToast(`✅ Berhasil mengimpor ${count} data baru. (${duplicateCount} data duplikat dilewati otomatis agar tidak double!)`, 'success');
+      } else {
+        showToast('✅ ' + count + ' transaksi berhasil diimport!', 'success');
+      }
     } catch(err) {
       showToast('❌ Gagal: ' + err.message, 'error');
     }
@@ -3991,5 +4011,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a274f421380a70ac',t:'MTc4NjA5MTc4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a275d84c7ae16cee',t:'MTc4NjEwMTEzMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
