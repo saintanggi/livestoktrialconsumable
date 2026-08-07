@@ -1,0 +1,3285 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Stock Control Room & Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; min-height: 100vh; overflow-x: hidden; }
+  
+  /* Sidebar Modern Styling */
+  .sidebar { width: 260px; background: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; position: fixed; height: 100vh; z-index: 100; overflow-y: auto; }
+  .sidebar-top { display: flex; flex-direction: column; gap: 16px; }
+  .brand { display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid #30363d; padding-bottom: 12px; }
+  .brand h1 { font-size: 15px; color: #f2a93b; letter-spacing: 0.5px; font-weight: 700; }
+  .brand small { color: #8b949e; font-size: 11px; font-weight: 500; }
+  
+  .dash-buttons { display: flex; flex-direction: column; gap: 4px; }
+  .dash-btn { padding: 8px 12px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #8b949e; cursor: pointer; font-size: 12px; font-weight: 600; text-align: left; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease; }
+  .dash-btn.active { background: #f2a93b22; color: #f2a93b; border-color: #f2a93b55; }
+  .dash-btn:hover:not(.active) { background: #21262d; color: #e6edf3; }
+  
+  .sidebar-footer { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #30363d; padding-top: 12px; }
+  .status-box { display: flex; align-items: center; justify-content: space-between; background: #0d1117; padding: 6px 10px; border-radius: 6px; border: 1px solid #30363d; font-size: 11px; }
+  .status { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.online { background: #3fb950; }
+  .dot.offline { background: #f85149; }
+  .dot.syncing { background: #58a6ff; animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;}50%{opacity:.3;} }
+  
+  .status-url { font-size: 10px; color: #8b949e; background: #0d1117; padding: 4px 8px; border-radius: 4px; border: 1px solid #30363d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Main Content Area */
+  .main-content { margin-left: 260px; flex: 1; display: flex; flex-direction: column; padding: 20px; min-width: 0; background: #0d1117; }
+  
+  .topbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: #161b22; padding: 10px 16px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 16px; }
+  
+  .btn { padding: 6px 12px; border: 1px solid #30363d; border-radius: 6px; background: #21262d; color: #c9d1d9; cursor: pointer; font-size: 12px; font-weight: 500; transition: background 0.2s; }
+  .btn:hover { background: #30363d; }
+  .btn-primary { background: #f2a93b; color: #000; border-color: #f2a93b; font-weight: 600; }
+  .btn-primary:hover { background: #e09a2a; }
+  .btn-danger { color: #f85149; border-color: #f85149; background: #f851491a; }
+  .btn-danger:hover { background: #f8514933; }
+  .btn-success { color: #3fb950; border-color: #3fb950; background: #3fb9501a; }
+  .btn-success:hover { background: #3fb95033; }
+
+  .search-box { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .search-box input { padding: 6px 10px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; font-size: 12px; min-width: 180px; }
+  .search-box input:focus { outline: none; border-color: #f2a93b; }
+
+  /* Membuat ikon kalender/date picker menjadi putih terang di mode gelap */
+  input[type="date"] {
+    color-scheme: dark;
+  }
+
+  .panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .panel h3 { font-size: 14px; margin-bottom: 8px; color: #f2a93b; font-weight: 600; }
+  .panel p { font-size: 12px; color: #8b949e; margin-bottom: 8px; }
+  
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 10px; color: #8b949e; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+  .form-group input, .form-group select { padding: 6px 10px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; font-size: 12px; }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: #f2a93b; }
+  
+  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; }
+  .kpi .label { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .kpi .value { font-size: 20px; font-weight: 700; margin-top: 4px; color: #e6edf3; }
+
+  /* Tabel Lebih Padat & Nama Item Memanjang ke Samping Tanpa Turun ke Bawah */
+  .table-wrap { overflow-x: auto; background: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: auto; }
+  th { background: #0d1117; color: #8b949e; text-align: left; padding: 10px 6px; border-bottom: 1px solid #30363d; font-size: 10px; text-transform: uppercase; position: sticky; top: 0; z-index: 10; letter-spacing: 0.5px; white-space: nowrap; }
+  td { padding: 8px 6px; border-bottom: 1px solid #21262d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  tr:hover td { background: #1c2128; }
+  
+  /* Khusus Kolom Item agar Nama Panjang Tampil ke Samping Full & Tidak Melebar ke Bawah */
+  .col-item { width: auto !important; min-width: 280px !important; white-space: nowrap !important; overflow: visible !important; text-overflow: clip !important; }
+
+  /* Pengaturan Lebar Kolom Lainnya */
+  .col-no { width: 32px !important; text-align: center; padding-left: 2px; padding-right: 2px; }
+  .col-checkbox { width: 28px !important; text-align: center; padding-left: 2px !important; padding-right: 2px !important; }
+  .col-tanggal { width: 85px !important; padding-left: 2px !important; }
+  .col-ticket { width: 90px !important; }
+  .col-kode { width: 120px !important; }
+  .col-satuan { width: 60px; text-align: center; }
+  .col-num { width: 65px; text-align: right; }
+  .col-in { width: 55px !important; text-align: right !important; }
+  .col-out { width: 55px !important; text-align: right !important; }
+  .col-gerai { width: 120px !important; }
+  .col-ket { width: 120px !important; }
+  .col-user { width: 70px !important; text-align: center; }
+  .col-status { width: 80px; text-align: center; }
+  .col-action { width: 85px; text-align: center; }
+
+  .badge { padding: 3px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; display: inline-block; }
+  .badge.crit { background: #f851491a; color: #f85149; border: 1px solid #f8514933; }
+  .badge.warn { background: #f2a93b1a; color: #f2a93b; border: 1px solid #f2a93b33; }
+  .badge.ok { background: #3fb9501a; color: #3fb950; border: 1px solid #3fb95033; }
+  
+  .text-muted { color: #8b949e; }
+  .text-right { text-align: right !important; }
+  .text-center { text-align: center !important; }
+  .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .hidden { display: none !important; }
+  
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; z-index: 1000; }
+  .modal.active { display: flex; }
+  .modal-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; max-width: 400px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .modal-card h3 { margin-bottom: 10px; font-size: 14px; color: #f2a93b; }
+  .modal-card .form-group { margin-bottom: 8px; }
+  .modal-card .flex { justify-content: flex-end; margin-top: 10px; }
+  
+  .footer { text-align: center; padding: 14px; color: #8b949e; font-size: 11px; border-top: 1px solid #30363d; margin-top: 20px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .scroll { max-height: 420px; overflow-y: auto; }
+  
+  .tab-bar { display: flex; gap: 4px; border-bottom: 1px solid #30363d; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+  .tab-btn { padding: 6px 12px; background: none; border: none; color: #8b949e; cursor: pointer; font-size: 12px; border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 500; }
+  .tab-btn.active { color: #f2a93b; border-bottom-color: #f2a93b; font-weight: 600; }
+  .tab-btn:hover { color: #e6edf3; }
+  .tab-btn .count { background: #21262d; padding: 0 5px; border-radius: 8px; font-size: 10px; margin-left: 4px; }
+  
+  .toast { position: fixed; bottom: 16px; right: 16px; padding: 10px 16px; border-radius: 6px; color: #fff; font-size: 12px; z-index: 2000; opacity: 0; transition: opacity 0.3s; max-width: 350px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .toast.show { opacity: 1; }
+  .toast.success { background: #2ea043; }
+  .toast.error { background: #f85149; }
+  .toast.info { background: #58a6ff; }
+  
+  .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; align-items: center; }
+  .chart-card h4 { font-size: 11px; color: #f2a93b; margin-bottom: 6px; width: 100%; text-align: left; font-weight: 600; }
+  .chart-container { position: relative; width: 100%; height: 140px; display: flex; justify-content: center; align-items: center; }
+  
+  .bulk-toolbar { display: flex; justify-content: space-between; align-items: center; background: #21262d; padding: 8px 12px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 10px; }
+  .table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
+  .local-search-input { padding: 5px 10px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; font-size: 12px; min-width: 180px; }
+  .local-search-input:focus { outline: none; border-color: #f2a93b; }
+  
+  .date-filter-box { display: flex; gap: 4px; align-items: center; font-size: 11px; color: #8b949e; }
+  .date-filter-box input { padding: 4px 6px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; font-size: 11px; }
+  
+  .pagination-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #161b22; border: 1px solid #30363d; border-radius: 0 0 8px 8px; font-size: 12px; margin-bottom: 16px; }
+  .shortcut-hint { font-size: 10px; color: #8b949e; background: #21262d; padding: 1px 5px; border-radius: 4px; border: 1px solid #30363d; margin-left: auto; }
+  
+  .export-panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  @media(max-width: 900px) {
+    body { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #30363d; }
+    .main-content { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- GLOBAL DATALISTS FOR SEARCHABLE ITEM SELECTION -->
+<datalist id="dlAllItems"></datalist>
+<datalist id="dlHoItems"></datalist>
+<datalist id="dlAgenItems"></datalist>
+
+<!-- SIDEBAR DASHBOARD DI SEBELAH KIRI -->
+<div class="sidebar">
+  <div class="sidebar-top">
+    <div class="brand">
+      <h1>📦 LIVE STOCK CONSUMABLE</h1>
+      <small id="userStatus">PUBLIC VIEW</small>
+    </div>
+    <div class="dash-buttons" id="dashButtons">
+      <button class="dash-btn active" data-dash="ho">🏢 HO</button>
+      <button class="dash-btn" data-dash="agen">🏪 AGEN</button>
+      <button class="dash-btn" data-dash="return">📦 RETURN</button>
+      <button class="dash-btn" data-dash="stok_harian">📅 Stok Harian</button>
+      <button class="dash-btn" data-dash="grafik" style="background:#58a6ff1a; color:#58a6ff; border-color:#58a6ff44;">📈 Grafik Global</button>
+      <button class="dash-btn auth-btn" data-dash="transfer" style="display:none;">🔄 Transfer</button>
+      <button class="dash-btn auth-btn" data-dash="upload" style="display:none;">📁 Upload</button>
+      <button class="dash-btn auth-btn" data-dash="opname" style="display:none;">📊 Opname</button>
+      <button class="dash-btn auth-btn" data-dash="master" style="display:none;">⚙️ Master</button>
+      <button class="dash-btn auth-btn" data-dash="gerai" style="display:none; color:#3fb950; border-color:#3fb95055;" data-dash-target="gerai">🏪 Gerai</button>
+      <button class="dash-btn auth-btn" data-dash="audit" style="display:none; color:#ba75ff; border-color:#ba75ff55;" data-dash-target="audit">🔍 Audit Log</button>
+      <button class="dash-btn auth-btn" data-dash="input" style="display:none;">➕ Transaksi manual <span class="shortcut-hint">Ctrl+I</span></button>
+      <button class="dash-btn" data-dash="users" style="display:none; background:#ba75ff22; color:#ba75ff; border-color:#ba75ff;">👤 Users</button>
+    </div>
+  </div>
+  
+  <div class="sidebar-footer">
+    <div class="status-box">
+      <span class="status">
+        <span class="dot online" id="statusDot"></span>
+        <span id="statusText">ONLINE</span>
+      </span>
+    </div>
+    <span class="status-url" id="gasUrlDisplay">Supabase: ...</span>
+    
+    <!-- OFFLINE QUEUE BOX -->
+    <div class="status-box" id="offlineQueueBox" style="display:none; flex-direction:column; gap:6px; border-color:#f2a93b; background:#f2a93b1a; padding:8px; border-radius:6px; margin-top:4px;">
+      <span style="font-size:11px; font-weight:bold; color:#f2a93b; display:flex; align-items:center; justify-content:space-between; width:100%;">
+        <span>⚠️ Antrean Lokal (Offline)</span>
+        <span id="offlineQueueCount" class="badge warn" style="padding:1px 5px; font-size:9px; border-radius:4px;">0</span>
+      </span>
+      <button class="btn btn-primary" style="padding:3px 6px; font-size:10px; width:100%; font-weight:600; background:#f2a93b; color:#000;" onclick="syncOfflineQueue()">🔄 Sinkron Sekarang</button>
+    </div>
+
+    <button class="btn btn-primary" onclick="showLogin()" id="loginBtn" style="width:100%;">🔐 Login</button>
+    <button class="btn btn-danger" onclick="logout()" id="logoutBtn" style="display:none; width:100%;">Logout</button>
+  </div>
+</div>
+
+<!-- MAIN CONTENT AREA DI SEBELAH KANAN -->
+<div class="main-content">
+
+  <div class="topbar">
+    <div class="flex" style="gap: 10px; align-items: center;">
+      <span style="font-size: 13px; font-weight: bold; color: #f2a93b;">Control Room & Analytics</span>
+    </div>
+    <div class="search-box">
+      <input id="globalSearch" placeholder="Cari global...">
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- PANEL GRAFIK KHUSUS TERPISAH -->
+    <div class="panel hidden" id="panelGrafik">
+      <h3>📈 Dashboard Grafik & Analitik Global</h3>
+      <p>Visualisasi terpusat seluruh stok gudang (HO, AGEN, RETURN), tren transaksi harian, dan produk teratas secara global.</p>
+      
+      <div class="analytics-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 14px;">
+        <div class="chart-card">
+          <h4>📦 Total Stok per Gudang (HO vs AGEN vs RETURN)</h4>
+          <div class="chart-container" style="height: 180px;">
+            <canvas id="grafikGlobalStockWarehouse"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>📅 Tren Transaksi Harian (Global In/Out)</h4>
+          <div class="chart-container" style="height: 180px;">
+            <canvas id="grafikGlobalDailyTrx"></canvas>
+          </div>
+        </div>
+        <div class="chart-card" style="grid-column: 1 / -1;">
+          <h4>🔥 Top 10 Produk Global (Seluruh Jenis Barang Berdasarkan Total Pergerakan)</h4>
+          <div class="chart-container" style="height: 220px;">
+            <canvas id="grafikGlobalTopProducts"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL GERAI TERPUSAT -->
+    <div class="panel hidden" id="panelGerai">
+      <h3>🏪 Manajemen Gerai / Cabang Terpusat</h3>
+      <div class="form-grid" style="margin-bottom: 12px;">
+        <div class="form-group"><label>Nama Gerai / Cabang</label><input type="text" id="newGeraiNama" placeholder="Contoh: Gerai Utama / Cabang BSD"></div>
+        <div class="form-group"><label>Lokasi / Keterangan</label><input type="text" id="newGeraiLokasi" placeholder="Lokasi gerai"></div>
+        <div class="form-group" style="justify-content: flex-end;"><button class="btn btn-primary" onclick="saveGerai()">Tambah Gerai</button></div>
+      </div>
+    </div>
+
+    <!-- PANEL AUDIT TRAIL LOG -->
+    <div class="panel hidden" id="panelAudit">
+      <h3>🔍 Riwayat Audit (Audit Trail Log)</h3>
+      <p>Catatan riwayat perubahan master barang, penghapusan, dan aktivitas penting untuk keamanan dan akuntabilitas staf.</p>
+    </div>
+
+    <div class="panel hidden" id="panelStokHarian">
+      <h3>📅 Laporan Stok Harian</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Dari Tanggal</label><input type="date" id="filterStart" value="2026-08-01"></div>
+        <div class="form-group"><label>Sampai Tanggal</label><input type="date" id="filterEnd" value="2026-08-04"></div>
+        <div class="form-group"><label>Gudang</label>
+          <select id="filterGudang">
+            <option value="ALL">Semua</option>
+            <option value="HO">HO</option>
+            <option value="AGEN">AGEN</option>
+            <option value="RETURN">RETURN</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex-direction:row; align-items:flex-end; gap:6px;">
+          <button class="btn btn-primary" onclick="renderStokHarian()">Tampilkan</button>
+          <button class="btn btn-success" onclick="exportStokHarian()">📥 Excel</button>
+          <button class="btn auth-btn" onclick="syncReportToGAS()" style="display:none; color:#58a6ff; border-color:#58a6ff; background:#58a6ff1a;">☁️ Simpan ke Cloud</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelTransfer">
+      <h3>🔄 Transfer Stok Antar Gudang</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Tanggal</label><input type="date" id="trfTgl"></div>
+        <div class="form-group"><label>No Ticket</label><input type="text" id="trfTicket" placeholder="TRF-001"></div>
+        <div class="form-group"><label>Arah</label>
+          <select id="trfArah">
+            <option value="HO_AGEN">HO → AGEN</option>
+            <option value="AGEN_HO">AGEN → HO</option>
+          </select>
+        </div>
+        <div class="form-group"><label>QTY</label><input type="number" id="trfQty" min="1" placeholder="0"></div>
+        <div class="form-group"><label>Item HO</label><input type="text" id="trfHoItem" list="dlHoItems" placeholder="🔍 Ketik cari item HO..."></div>
+        <div class="form-group"><label>Item AGEN</label><input type="text" id="trfAgenItem" list="dlAgenItems" placeholder="🔍 Ketik cari item AGEN..."></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Keterangan</label><input type="text" id="trfKet" placeholder="Keterangan"></div>
+        <div class="form-group"><button class="btn btn-primary" onclick="processTransfer()">Proses Transfer</button></div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelUpload">
+      <h3>📁 Upload Excel Massal</h3>
+      <p>Format: Tanggal | Ticket | Kode | Jenis(in/out) | QTY | Gerai | Keterangan</p>
+      <div class="flex">
+        <label class="btn" style="cursor:pointer;">
+          📂 Pilih File
+          <input type="file" id="fileUpload" accept=".xlsx" style="display:none;">
+        </label>
+        <span id="fileName">Belum ada file</span>
+        <button class="btn btn-primary" onclick="processBulk()">🚀 Proses & Sync</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelOpname">
+      <h3>📊 Stok Opname</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Tanggal</label><input type="date" id="opnTgl"></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Pilih Barang</label><input type="text" id="opnItem" list="dlAllItems" placeholder="🔍 Ketik cari kode / nama barang..."></div>
+        <div class="form-group"><label>Stok Fisik</label><input type="number" id="opnFisik" min="0" placeholder="0"></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Catatan</label><input type="text" id="opnKet" placeholder="Catatan opname"></div>
+        <div class="form-group"><button class="btn btn-primary" onclick="processOpname()">Simpan Opname</button></div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelMaster">
+      <h3>⚙️ Tambah Item Baru</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Status</label>
+          <select id="mStatus">
+            <option value="HO">HO</option>
+            <option value="AGEN">AGEN</option>
+            <option value="RETURN">RETURN</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Kode</label><input type="text" id="mKode" placeholder="KODE_ITEM"></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Nama</label><input type="text" id="mNama" placeholder="Nama Barang"></div>
+        <div class="form-group"><label>Satuan</label><input type="text" id="mSatuan" value="PCS"></div>
+        <div class="form-group"><label>Buffer</label><input type="number" id="mBuffer" value="0"></div>
+        <div class="form-group"><label>Stok Awal</label><input type="number" id="mAwal" value="0"></div>
+        <div class="form-group"><button class="btn btn-primary" onclick="saveMaster()">Simpan Item</button></div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelInput">
+      <h3>➕ Input Transaksi Harian</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Tanggal</label><input type="date" id="inTgl"></div>
+        <div class="form-group"><label>Ticket</label><input type="text" id="inTicket" placeholder="HT-001"></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Barang</label><input type="text" id="inItem" list="dlAllItems" placeholder="🔍 Ketik cari kode / nama barang..."></div>
+        <div class="form-group"><label>Jenis</label>
+          <select id="inJenis">
+            <option value="in">IN</option>
+            <option value="out">OUT</option>
+          </select>
+        </div>
+        <div class="form-group"><label>QTY</label><input type="number" id="inQty" min="1" placeholder="0"></div>
+        <div class="form-group"><label>Gerai (Cabang)</label><select id="inGerai"></select></div>
+        <div class="form-group"><button class="btn btn-primary" onclick="submitTrx()">Simpan</button></div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelUsers">
+      <h3>👤 Manajemen User</h3>
+      <div class="form-grid" style="margin-bottom:10px;">
+        <div class="form-group"><label>Username</label><input type="text" id="newUser" placeholder="username"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="newPass" placeholder="password"></div>
+        <div class="form-group"><label>Role</label>
+          <select id="newRole">
+            <option value="staff">Staff</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group"><button class="btn btn-primary" onclick="createUser()">Buat User</button></div>
+      </div>
+    </div>
+
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi"><div class="label">Item Kritis</div><div class="value">0</div></div>
+      <div class="kpi"><div class="label">Total Item</div><div class="value">0</div></div>
+      <div class="kpi"><div class="label">Total Stok</div><div class="value">0</div></div>
+    </div>
+
+    <!-- PANEL DOWNLOAD LOG TERPISAH BERDASARKAN FILTER TANGGAL -->
+    <div class="export-panel" id="exportLogPanel">
+      <span style="font-size: 11px; font-weight: bold; color: #f2a93b;">📥 Download Log Transaksi:</span>
+      <div class="date-filter-box">
+        <span>Dari:</span> <input type="date" id="exportStart" value="2026-08-01">
+        <span>s/d</span> <input type="date" id="exportEnd" value="2026-08-04">
+      </div>
+      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('HO')">📥 Excel HO</button>
+      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('AGEN')">📥 Excel AGEN</button>
+      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('RETURN')">📥 Excel RETURN</button>
+      <button class="btn btn-primary" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('ALL')">📥 Excel Semua</button>
+    </div>
+
+    <!-- Grafik / Analytics -->
+    <div id="chartsSection"></div>
+
+    <!-- Menu Tab -->
+    <div class="tab-bar" id="tabBar"></div>
+
+    <!-- Toolbar tabel -->
+    <div class="table-toolbar" id="tableToolbarSection">
+      <div class="flex" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+        <div class="local-search-box">
+          <input type="text" id="localTableSearch" class="local-search-input" placeholder="🔍 Cari item / kode di tabel ini...">
+        </div>
+        <div class="date-filter-box" id="tableDateFilterContainer">
+          <span>📅 Filter:</span>
+          <input type="date" id="tableFilterStart" value="2026-08-01" onchange="currentPage=1; renderContent()">
+          <span>s/d</span>
+          <input type="date" id="tableFilterEnd" value="2026-08-04" onchange="currentPage=1; renderContent()">
+          <button class="btn" style="padding: 3px 6px; font-size: 10px;" onclick="resetTableDateFilter()">Reset</button>
+        </div>
+      </div>
+      <div class="bulk-toolbar hidden" id="bulkToolbar" style="margin-bottom:0;">
+        <span id="selectedLogInfo" style="font-size: 12px; color: #f2a93b;">0 log dipilih</span>
+        <button class="btn btn-danger" onclick="deleteSelectedLogs()">🗑️ Hapus Log Terpilih</button>
+      </div>
+    </div>
+
+    <!-- Tabel / List Item -->
+    <div id="tableContent">
+      <div class="table-wrap">
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Data</th></tr></thead>
+            <tbody><tr><td class="text-muted text-center" style="padding:15px;">Loading data...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span id="footerInfo">LIVE STOCK SYSTEM | Shortcut: <kbd>Ctrl+I</kbd> (Input Trx), <kbd>Esc</kbd> (Tutup Modal)</span>
+      <div class="flex" style="gap: 8px; margin-top: 4px; display: none;" id="adminFooterActions">
+        <button class="btn" onclick="pullData()" style="color:#f2a93b; border-color:#f2a93b;">☁️ Tarik Data dari Supabase</button>
+        <button class="btn" onclick="testGASConnection()" style="color:#58a6ff; border-color:#58a6ff;">🔌 Test Koneksi Supabase</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="loginModal">
+  <div class="modal-card">
+    <h3>🔐 Login</h3>
+    <div class="form-group"><label>Username</label><input type="text" id="loginUser" placeholder="admin"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="loginPass" placeholder="••••••••"></div>
+    <div class="flex">
+      <button class="btn" onclick="hideLogin()">Batal</button>
+      <button class="btn btn-primary" onclick="doLogin()">Masuk</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="editUserModal">
+  <div class="modal-card">
+    <h3>👤 Edit Kredensial User</h3>
+    <input type="hidden" id="editUserOldName">
+    <div class="form-group"><label>Username Baru</label><input type="text" id="editUserNewName"></div>
+    <div class="form-group"><label>Password Baru</label><input type="password" id="editUserNewPass" placeholder="Kosongkan jika tidak ganti"></div>
+    <div class="form-group"><label>Role</label>
+      <select id="editUserRole">
+        <option value="staff">Staff</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div class="flex">
+      <button class="btn" onclick="hideEditUser()">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditUser()">Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="editLogModal">
+  <div class="modal-card">
+    <h3>✏️ Edit Transaksi</h3>
+    <input type="hidden" id="editLogId">
+    <div class="form-group"><label>Tanggal</label><input type="date" id="editTgl"></div>
+    <div class="form-group"><label>Ticket</label><input type="text" id="editTicket"></div>
+    <div class="form-group"><label>Barang</label><input type="text" id="editItem" list="dlAllItems" placeholder="🔍 Ketik cari barang..."></div>
+    <div class="form-group"><label>Jenis</label>
+      <select id="editJenis">
+        <option value="in">IN</option>
+        <option value="out">OUT</option>
+      </select>
+    </div>
+    <div class="form-group"><label>QTY</label><input type="number" id="editQty" min="1"></div>
+    <div class="form-group"><label>Gerai</label><input type="text" id="editGerai"></div>
+    <div class="form-group"><label>Keterangan</label><input type="text" id="editKet"></div>
+    <div class="flex">
+      <button class="btn" onclick="hideEditLog()">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditLog()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="editMasterModal">
+  <div class="modal-card">
+    <h3>✏️ Edit Master</h3>
+    <input type="hidden" id="editMasterId">
+    <div class="form-group"><label>Status</label>
+      <select id="editMasterStatus">
+        <option value="HO">HO</option>
+        <option value="AGEN">AGEN</option>
+        <option value="RETURN">RETURN</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Kode</label><input type="text" id="editMasterKode"></div>
+    <div class="form-group"><label>Nama</label><input type="text" id="editMasterNama"></div>
+    <div class="form-group"><label>Satuan</label><input type="text" id="editMasterSatuan"></div>
+    <div class="form-group"><label>Buffer</label><input type="number" id="editMasterBuffer"></div>
+    <div class="form-group"><label>Stok Awal</label><input type="number" id="editMasterAwal"></div>
+    <div class="flex">
+      <button class="btn" onclick="hideEditMaster()">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditMaster()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- KONFIGURASI SUPABASE ---
+// Silakan ganti dengan URL dan ANON KEY dari dasbor proyek Supabase Anda
+const SUPABASE_URL = "https://qdljeibmnolizjprignz.supabaseClient.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbGplaWJtbm9saXpqcHJpZ256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjcyMDEsImV4cCI6MjEwMTYwMzIwMX0.Z7Gw29C8r8fbg-FcvGVGsBUw1Drt6FXqMmYsVkkSjHk";
+
+// Inisialisasi Supabase Client
+const supabaseClient = (typeof window.supabase !== 'undefined') ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+let currentPage = 1;
+
+// --- SECURE HASHING & OFFLINE SYNCHRONIZATION HELPERS ---
+async function hashPassword(password) {
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    try {
+      const msgBuffer = new TextEncoder().encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (err) {
+      console.warn('Web Crypto SHA-256 failed, using fallback.', err);
+    }
+  }
+  // Fallback sederhana jika Web Crypto API tidak didukung (misal di iframe non-HTTPS)
+  return "plain_" + password;
+}
+
+function addToOfflineQueue(action, sheetTarget, row, id = null) {
+  let queue = JSON.parse(localStorage.getItem('stock_offline_queue') || '[]');
+  const exists = queue.some(item => 
+    item.action === action && 
+    item.sheetTarget === sheetTarget && 
+    JSON.stringify(item.row) === JSON.stringify(row) && 
+    item.targetId === id
+  );
+  if (!exists) {
+    queue.push({
+      id: 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      action,
+      sheetTarget,
+      row,
+      targetId: id,
+      timestamp: new Date().toLocaleString('id-ID')
+    });
+    localStorage.setItem('stock_offline_queue', JSON.stringify(queue));
+  }
+  updateOfflineStatusUI();
+}
+
+function updateOfflineStatusUI() {
+  const queue = JSON.parse(localStorage.getItem('stock_offline_queue') || '[]');
+  const box = document.getElementById('offlineQueueBox');
+  const count = document.getElementById('offlineQueueCount');
+  if (box && count) {
+    if (queue.length > 0) {
+      box.style.display = 'flex';
+      count.textContent = queue.length;
+    } else {
+      box.style.display = 'none';
+    }
+  }
+}
+
+async function syncOfflineQueue() {
+  if (!isLoggedIn()) {
+    showToast('🔐 Login terlebih dahulu untuk sinkronisasi antrean!', 'error');
+    showLogin();
+    return;
+  }
+  let queue = JSON.parse(localStorage.getItem('stock_offline_queue') || '[]');
+  if (queue.length === 0) {
+    showToast('Tidak ada antrean tertunda.', 'info');
+    return;
+  }
+
+  const btn = document.querySelector('#offlineQueueBox button');
+  if (btn) { 
+    btn.disabled = true; 
+    btn.textContent = '⏳ Menyinkronkan...'; 
+  }
+  setStatus('syncing', 'SYNC OFFLINE...');
+  showToast(`⏳ Sinkronisasi ${queue.length} antrean dimulai...`, 'info');
+
+  let successCount = 0;
+  let failedCount = 0;
+
+  for (let item of queue) {
+    let res;
+    try {
+      if (item.action === 'bulk_append') {
+        res = await syncBulkToGAS(item.sheetTarget, item.row, true); // true to skip automatic queuing
+      } else if (item.action === 'bulk_delete') {
+        res = await syncBulkDeleteToGAS(item.sheetTarget, item.targetId, true);
+      } else {
+        res = await syncToGAS(item.sheetTarget, item.row, item.action, item.targetId, true);
+      }
+
+      if (res && res.success) {
+        successCount++;
+      } else {
+        failedCount++;
+        break;
+      }
+    } catch (err) {
+      failedCount++;
+      break;
+    }
+  }
+
+  if (successCount > 0) {
+    queue.splice(0, successCount);
+    localStorage.setItem('stock_offline_queue', JSON.stringify(queue));
+    addAudit('SYNC_OFFLINE', `Berhasil sinkron ${successCount} transaksi tertunda ke cloud`);
+  }
+
+  updateOfflineStatusUI();
+
+  if (failedCount === 0) {
+    setStatus('online', 'ONLINE');
+    showToast(`✅ Berhasil menyinkronkan ${successCount} data ke cloud!`, 'success');
+    await pullData();
+  } else {
+    setStatus('offline', 'ERR (SYNC)');
+    showToast(`⚠️ Sinkronisasi terputus. ${successCount} berhasil, ${queue.length} masih tertunda. Periksa internet!`, 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔄 Sinkron Sekarang';
+    }
+  }
+}
+const rowsPerPage = 25;
+
+document.addEventListener('DOMContentLoaded', function() {
+  const display = document.getElementById('gasUrlDisplay');
+  if (display) {
+    display.textContent = 'Supabase: ' + SUPABASE_URL.substring(0, 40) + '...';
+  }
+  
+  // Helper functions for timezone-safe local date strings
+  function getLocalTodayStr() {
+    const today = new Date();
+    const offset = today.getTimezoneOffset();
+    const localDate = new Date(today.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+  }
+  function getLocalMonthStartStr() {
+    const today = new Date();
+    const offset = today.getTimezoneOffset();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const localDate = new Date(startOfMonth.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+  }
+
+  const todayStr = getLocalTodayStr();
+  const defaultStart = getLocalMonthStartStr();
+  
+  ['trfTgl', 'opnTgl', 'inTgl', 'editTgl', 'exportStart'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = defaultStart;
+  });
+
+  ['exportEnd'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = todayStr;
+  });
+  
+  const fStart = document.getElementById('filterStart');
+  const fEnd = document.getElementById('filterEnd');
+  if (fStart) fStart.value = defaultStart;
+  if (fEnd) fEnd.value = todayStr;
+
+  const tStart = document.getElementById('tableFilterStart');
+  const tEnd = document.getElementById('tableFilterEnd');
+  if (tStart) tStart.value = defaultStart;
+  if (tEnd) tEnd.value = todayStr;
+
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      if (isLoggedIn()) {
+        const inputBtn = document.querySelector('[data-dash="input"]');
+        if (inputBtn) inputBtn.click();
+      } else {
+        showToast('Login terlebih dahulu untuk input transaksi!', 'error');
+        showLogin();
+      }
+    }
+    if (e.key === 'Escape') {
+      hideLogin();
+      hideEditUser();
+      hideEditLog();
+      hideEditMaster();
+    }
+  });
+});
+
+const MASTER_EXCEL = []; 
+
+const DEFAULT_USERS = [
+  {username:"admin", pass:"admin123", role:"admin"},
+  {username:"gudang", pass:"gudang123", role:"staff"}
+];
+
+// Auto-reset untuk file:/// lokal agar selalu bisa login tanpa terpengaruh hash lama
+if (window.location.protocol === 'file:') {
+  try {
+    localStorage.setItem('stock_users', JSON.stringify([
+      {username:"admin", pass:"admin123", role:"admin"},
+      {username:"gudang", pass:"gudang123", role:"staff"}
+    ]));
+    sessionStorage.removeItem('stock_user');
+    console.log("Local file:/// protocol detected. Resetting local stock_users credentials to plain text defaults for safety.");
+  } catch(e) {
+    console.error("Local reset failed:", e);
+  }
+}
+
+let users = DEFAULT_USERS;
+try {
+  const savedUsers = localStorage.getItem('stock_users');
+  if (savedUsers) {
+    const parsedUsers = JSON.parse(savedUsers);
+    if (Array.isArray(parsedUsers) && parsedUsers.length > 0) {
+      users = parsedUsers;
+    }
+  } else {
+    localStorage.setItem('stock_users', JSON.stringify(DEFAULT_USERS));
+  }
+} catch(e) {
+  users = DEFAULT_USERS;
+}
+
+function saveUsersToStorage() {
+  try {
+    localStorage.setItem('stock_users', JSON.stringify(users));
+  } catch(e) {}
+}
+
+let currentUser = JSON.parse(sessionStorage.getItem('stock_user')) || null;
+
+let data = {
+  ho: [],
+  agen: [],
+  return: [],
+  master: [],
+  logs: [],
+  gerai: ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'],
+  audit: []
+};
+
+let activeDash = 'ho';
+let activeTab = 'ho';
+let searchQuery = '';
+let warehouseHealthChartInstance = null;
+let warehouseOutflowChartInstance = null;
+
+let grafikGlobalStockWarehouseInstance = null;
+let grafikGlobalDailyTrxInstance = null;
+let grafikGlobalTopProductsInstance = null;
+
+function addAudit(action, detail) {
+  const user = currentUser ? currentUser.username : 'System';
+  const time = new Date().toLocaleString('id-ID');
+  data.audit.unshift({ id: 'aud_' + Date.now(), time, user, action, detail });
+  saveData();
+}
+
+function formatDateSimple(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr; 
+  
+  const options = { day: '2-digit', month: 'short', year: 'numeric' };
+  return d.toLocaleDateString('id-ID', options);
+}
+
+function formatExcelDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  return `${day} ${month} ${year}`;
+}
+
+function excelDateToISO(serial) {
+  if (!serial) return new Date().toISOString().split('T')[0];
+  if (isNaN(serial)) {
+    let parsed = new Date(serial);
+    if (!isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    return String(serial).trim();
+  }
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400;
+  const date_info = new Date(utc_value * 1000);
+  const year = date_info.getUTCFullYear();
+  const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date_info.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function fmt(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return Number(n).toLocaleString('id-ID');
+}
+
+function num(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  if (v === '-') return 0;
+  return Number(v) || 0;
+}
+
+function statusBadge(buffer, stok) {
+  const s = num(stok);
+  const b = num(buffer);
+  if (s < 0 || (b > 0 && s < b)) return 'crit';
+  if (b > 0 && s < b * 1.2) return 'warn';
+  return 'ok';
+}
+
+const statusLabel = {crit:'KRITIS', warn:'WASPADA', ok:'AMAN'};
+function getStatusText(buffer, stok) {
+  return statusLabel[statusBadge(buffer, stok)] || 'AMAN';
+}
+
+function genId() {
+  return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+}
+
+function saveData() {
+  localStorage.setItem('stock_data', JSON.stringify(data));
+}
+
+function loadData() {
+  const stored = localStorage.getItem('stock_data');
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed.master && parsed.master.length > 0) {
+        data = parsed;
+        if (!data.gerai) data.gerai = ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'];
+        if (!data.audit) data.audit = [];
+        return true;
+      }
+    } catch(e) {}
+  }
+  return false;
+}
+
+function buildStokFromMaster(master) {
+  const ho = [], agen = [], ret = [];
+  master.forEach((m, idx) => {
+    const obj = {
+      id: m.id,
+      no: idx + 1,
+      item: m.item,
+      kode: m.kode,
+      satuan: m.satuan,
+      buffer: m.buffer || 0,
+      awal: m.awal || 0,
+      akhir: m.awal || 0,
+      totalIn: 0,
+      totalOut: 0,
+      kategori: m.item.split(' ')[0] || m.item
+    };
+    if (m.status === 'HO') ho.push(obj);
+    else if (m.status === 'AGEN') agen.push(obj);
+    else if (m.status === 'RETURN') ret.push(obj);
+  });
+  return { ho, agen, return: ret };
+}
+
+function initData() {
+  if (!loadData()) {
+    data.master = [];
+    data.ho = [];
+    data.agen = [];
+    data.return = [];
+    data.logs = [];
+    data.gerai = ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'];
+    data.audit = [];
+    saveData();
+  } else {
+    recalculateStok();
+    saveData();
+  }
+}
+
+function getMasterByStatus(status) {
+  return data.master.filter(m => m.status === status);
+}
+
+function getLogsByStatus(status) {
+  return data.logs.filter(l => l.status === status);
+}
+
+function getNormalizedStatus(status) {
+  let s = String(status || 'HO').toUpperCase();
+  if (s === 'AGEN') return 'AGEN';
+  if (s === 'RETURN') return 'RETURN';
+  return 'HO';
+}
+
+function recalculateStok() {
+  ['ho','agen','return'].forEach(key => {
+    data[key].forEach(item => {
+      item.akhir = item.awal || 0;
+      item.totalIn = 0;
+      item.totalOut = 0;
+    });
+  });
+
+  data.logs.forEach(log => {
+    let targetKey = 'ho';
+    const s = getNormalizedStatus(log.status);
+    if (s === 'AGEN') targetKey = 'agen';
+    else if (s === 'RETURN') targetKey = 'return';
+    else if (s === 'HO') targetKey = 'ho';
+
+    const item = data[targetKey].find(i => i.kode === log.kode);
+    if (item) {
+      if (log.in !== '-' && log.in !== '') {
+        const valIn = num(log.in);
+        item.akhir += valIn;
+        item.totalIn += valIn;
+      }
+      if (log.out !== '-' && log.out !== '') {
+        const valOut = num(log.out);
+        item.akhir -= valOut;
+        item.totalOut += valOut;
+      }
+    }
+  });
+
+  ['ho','agen','return'].forEach(key => {
+    data[key].forEach(item => {
+      item.status = statusBadge(item.buffer, item.akhir);
+    });
+  });
+
+  saveData();
+}
+
+function showToast(message, type = 'info') {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.className = 'toast ' + type + ' show';
+  setTimeout(() => { toast.className = 'toast'; }, 4000);
+}
+
+async function testGASConnection() {
+  showToast('🔌 Mengecek koneksi ke Supabase...', 'info');
+  setStatus('syncing', 'TESTING...');
+  try {
+    if (!supabaseClient) throw new Error('Supabase Client tidak terdeteksi! Periksa CDN atau kredensial.');
+    // Coba query sederhana untuk cek koneksi
+    const { data, error } = await supabaseClient.from('master_barang').select('count', { count: 'exact', head: true });
+    if (error) throw error;
+    showToast('✅ Koneksi ke Supabase BERHASIL!', 'success');
+    setStatus('online', 'ONLINE');
+  } catch (error) {
+    console.error('Supabase connection failed:', error);
+    showToast('❌ Gagal koneksi ke Supabase: Menggunakan data lokal. ' + error.message, 'error');
+    setStatus('offline', 'OFFLINE (LOKAL)');
+  }
+}
+
+async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = false) {
+  if (!currentUser) {
+    return { success: false, message: 'Login required' };
+  }
+  
+  // Memetakan sheet target GAS ke nama Tabel di Supabase
+  let table = 'log_transaksi';
+  if (sheet.startsWith('Master_')) {
+    table = 'master_barang';
+  }
+
+  try {
+    if (!supabaseClient) throw new Error('Supabase client belum diinisialisasi');
+
+    let error = null;
+    if (table === 'master_barang') {
+      if (action === 'append') {
+        const dbId = 'm_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+        const { error: err } = await supabaseClient.from('master_barang').insert({
+          id: dbId,
+          kode: row[0],
+          item: row[1],
+          status: row[2], // HO, AGEN, RETURN
+          satuan: row[3],
+          buffer: parseInt(row[4]) || 0,
+          awal: parseInt(row[5]) || 0
+        });
+        error = err;
+      } else if (action === 'update') {
+        const { error: err } = await supabaseClient.from('master_barang').update({
+          kode: row[0],
+          item: row[1],
+          status: row[2],
+          satuan: row[3],
+          buffer: parseInt(row[4]) || 0,
+          awal: parseInt(row[5]) || 0
+        }).eq('kode', id);
+        error = err;
+      } else if (action === 'delete') {
+        const { error: err } = await supabaseClient.from('master_barang').delete().eq('kode', id);
+        error = err;
+      }
+    } else if (table === 'log_transaksi') {
+      if (action === 'append') {
+        const { error: err } = await supabaseClient.from('log_transaksi').insert({
+          id: row[0],
+          tanggal: row[1],
+          no_ticket: row[2],
+          kode_item: row[3],
+          nama_item: row[4],
+          status_item: row[5],
+          in: String(row[6]),
+          out: String(row[7]),
+          nama_gerai: row[8],
+          keterangan: row[9],
+          user: row[10]
+        });
+        error = err;
+      } else if (action === 'update') {
+        const { error: err } = await supabaseClient.from('log_transaksi').update({
+          tanggal: row[1],
+          no_ticket: row[2],
+          kode_item: row[3],
+          nama_item: row[4],
+          status_item: row[5],
+          in: String(row[6]),
+          out: String(row[7]),
+          nama_gerai: row[8],
+          keterangan: row[9],
+          user: row[10]
+        }).eq('id', id);
+        error = err;
+      } else if (action === 'delete') {
+        const { error: err } = await supabaseClient.from('log_transaksi').delete().eq('id', id);
+        error = err;
+      }
+    }
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Supabase sync failed, queuing to outbox:', error);
+    if (!skipQueue) {
+      addToOfflineQueue(action, sheet, row, id);
+    }
+    return { success: false, message: 'Offline: Disimpan di antrean lokal. ' + error.message, isOffline: true };
+  }
+}
+
+async function syncBulkToGAS(sheet, rows, skipQueue = false) {
+  if (!currentUser) return { success: false, message: 'Login required' };
+  
+  let table = 'log_transaksi';
+  if (sheet.startsWith('Master_')) {
+    table = 'master_barang';
+  }
+
+  try {
+    if (!supabaseClient) throw new Error('Supabase client belum diinisialisasi');
+
+    let error = null;
+    if (table === 'log_transaksi') {
+      const dbRows = rows.map(r => ({
+        id: r[0],
+        tanggal: r[1],
+        no_ticket: r[2],
+        kode_item: r[3],
+        nama_item: r[4],
+        status_item: r[5],
+        in: String(r[6]),
+        out: String(r[7]),
+        nama_gerai: r[8],
+        keterangan: r[9],
+        user: r[10]
+      }));
+      const { error: err } = await supabaseClient.from('log_transaksi').insert(dbRows);
+      error = err;
+    }
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Supabase Bulk sync failed, queuing to outbox:', error);
+    if (!skipQueue) {
+      addToOfflineQueue('bulk_append', sheet, rows);
+    }
+    return { success: false, message: 'Offline: Disimpan di antrean lokal. ' + error.message, isOffline: true };
+  }
+}
+
+async function syncBulkDeleteToGAS(sheet, ids, skipQueue = false) {
+  if (!currentUser) return { success: false, message: 'Login required' };
+
+  let table = 'log_transaksi';
+  if (sheet.startsWith('Master_')) {
+    table = 'master_barang';
+  }
+
+  try {
+    if (!supabaseClient) throw new Error('Supabase client belum diinisialisasi');
+
+    let error = null;
+    if (table === 'log_transaksi') {
+      const { error: err } = await supabaseClient.from('log_transaksi').delete().in('id', ids);
+      error = err;
+    }
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Supabase Bulk Delete failed, queuing to outbox:', error);
+    if (!skipQueue) {
+      addToOfflineQueue('bulk_delete', sheet, null, ids);
+    }
+    return { success: false, message: 'Offline: Disimpan di antrean lokal. ' + error.message, isOffline: true };
+  }
+}
+
+async function pullData() {
+  const btn = document.querySelector('[onclick="pullData()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Loading...'; }
+  setStatus('syncing', 'SYNCING...');
+
+  try {
+    if (!supabaseClient) throw new Error('Supabase client belum diinisialisasi');
+
+    // 1. Tarik Data Master dari Supabase
+    const { data: dbMaster, error: masterErr } = await supabaseClient
+      .from('master_barang')
+      .select('*')
+      .order('kode', { ascending: true });
+    if (masterErr) throw masterErr;
+
+    // 2. Tarik Data Log Transaksi dari Supabase
+    const { data: dbLogs, error: logsErr } = await supabaseClient
+      .from('log_transaksi')
+      .select('*');
+    if (logsErr) throw logsErr;
+
+    // 3. Tarik Data Gerai dari Supabase
+    const { data: dbGerai, error: geraiErr } = await supabaseClient
+      .from('gerai')
+      .select('nama');
+    if (geraiErr) throw geraiErr;
+
+    // Map Master Barang
+    data.master = (dbMaster || []).map(m => ({
+      id: m.id,
+      kode: m.kode,
+      item: m.item,
+      status: getNormalizedStatus(m.status),
+      satuan: m.satuan || 'PCS',
+      buffer: parseInt(m.buffer) || 0,
+      awal: parseInt(m.awal) || 0
+    }));
+
+    // Map Log Transaksi
+    data.logs = (dbLogs || []).map(l => ({
+      id: l.id,
+      tanggal: l.tanggal,
+      ticket: l.no_ticket, // Dipetakan dari no_ticket di database
+      kode: l.kode_item,   // Dipetakan dari kode_item di database
+      item: l.nama_item,   // Dipetakan dari nama_item di database
+      status: getNormalizedStatus(l.status_item), // Dipetakan dari status_item di database
+      in: l.in,
+      out: l.out,
+      gerai: l.nama_gerai || '', // Dipetakan dari nama_gerai di database
+      ket: l.keterangan || '',   // Dipetakan dari keterangan di database
+      user: l.user || 'System'
+    }));
+
+    // Map Gerai
+    if (dbGerai && dbGerai.length > 0) {
+      data.gerai = dbGerai.map(g => g.nama);
+    }
+
+    const stok = buildStokFromMaster(data.master);
+    data.ho = stok.ho;
+    data.agen = stok.agen;
+    data.return = stok.return;
+
+    recalculateStok();
+    saveData();
+    refreshAll();
+    setStatus('online', 'ONLINE');
+    showToast('✅ Data & Log berhasil diambil dari Supabase!', 'success');
+
+    if (btn) {
+      btn.textContent = '✅ Berhasil';
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '☁️ Tarik Data';
+      }, 2000);
+    }
+  } catch(e) {
+    console.error('Supabase Pull failed, falling back to LocalStorage:', e);
+    loadData();
+    recalculateStok();
+    refreshAll();
+    
+    setStatus('offline', 'OFFLINE (LOKAL)');
+    showToast('⚠️ Gagal terhubung ke Supabase. Menggunakan data lokal.', 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '☁️ Tarik Data';
+    }
+  }
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusText');
+  if (!dot || !label) return;
+  const map = {
+    online: { cls: 'online', txt: 'ONLINE' },
+    offline: { cls: 'offline', txt: 'OFFLINE' },
+    syncing: { cls: 'syncing', txt: 'SYNCING...' }
+  };
+  const s = map[state] || map['online'];
+  dot.className = 'dot ' + s.cls;
+  label.textContent = text || s.txt;
+}
+
+function showLogin() { document.getElementById('loginModal').classList.add('active'); }
+function hideLogin() { document.getElementById('loginModal').classList.remove('active'); }
+async function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  const found = users.find(x => x.username === u);
+  if (found) {
+    // 1. Uji kecocokan langsung teks polos (Failsafe Terkuat)
+    if (found.pass === p) {
+      currentUser = found;
+      sessionStorage.setItem('stock_user', JSON.stringify(currentUser));
+      hideLogin();
+      updateUI();
+      showToast('✅ Login sebagai ' + u, 'success');
+      return;
+    }
+
+    // 2. Uji kecocokan hash (jika didukung)
+    try {
+      let inputHash = p;
+      if (p.length < 64) inputHash = await hashPassword(p);
+      
+      let userPassHash = found.pass;
+      if (userPassHash.length < 64) userPassHash = await hashPassword(userPassHash);
+
+      if (inputHash === userPassHash || found.pass === p || userPassHash === "plain_" + p) {
+        currentUser = found;
+        sessionStorage.setItem('stock_user', JSON.stringify(currentUser));
+        hideLogin();
+        updateUI();
+        showToast('✅ Login sebagai ' + u, 'success');
+        return;
+      }
+    } catch (err) {
+      console.error('Hashing error, falling back to plaintext check:', err);
+    }
+
+    showToast('❌ Username atau password salah!', 'error');
+  } else {
+    showToast('❌ Username atau password salah!', 'error');
+  }
+}
+function logout() {
+  sessionStorage.removeItem('stock_user');
+  currentUser = null;
+  updateUI();
+  showToast('Anda logout.', 'info');
+}
+function isAdmin() { return currentUser && currentUser.role === 'admin'; }
+function isLoggedIn() { return currentUser !== null; }
+
+function updateUI() {
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const userStatus = document.getElementById('userStatus');
+  const authBtns = document.querySelectorAll('.auth-btn');
+  const usersBtn = document.querySelector('[data-dash="users"]');
+  const adminFooterActions = document.getElementById('adminFooterActions');
+
+  if (currentUser) {
+    loginBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    userStatus.textContent = currentUser.username.toUpperCase() + ' (' + currentUser.role + ')';
+    authBtns.forEach(b => b.style.display = 'inline-block');
+    if (usersBtn) usersBtn.style.display = isAdmin() ? 'inline-block' : 'none';
+    if (adminFooterActions) adminFooterActions.style.display = isAdmin() ? 'flex' : 'none';
+  } else {
+    loginBtn.style.display = 'inline-block';
+    logoutBtn.style.display = 'none';
+    userStatus.textContent = 'PUBLIC VIEW';
+    authBtns.forEach(b => b.style.display = 'none');
+    if (usersBtn) usersBtn.style.display = 'none';
+    if (adminFooterActions) adminFooterActions.style.display = 'none';
+    if (['transfer','upload','opname','master','input','users','gerai','audit'].includes(activeDash)) {
+      activeDash = 'ho';
+      activeTab = 'ho';
+      document.querySelectorAll('.dash-btn').forEach(b => {
+        b.classList.remove('active');
+        if (b.dataset.dash === 'ho') b.classList.add('active');
+      });
+      showPanel(activeDash);
+    }
+  }
+  renderUserTable();
+  refreshAll();
+}
+
+async function createUser() {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  const u = document.getElementById('newUser').value.trim();
+  const p = document.getElementById('newPass').value.trim();
+  const r = document.getElementById('newRole').value;
+  if (!u || !p) { showToast('Username dan password harus diisi!', 'error'); return; }
+  if (users.some(x => x.username === u)) { showToast('Username sudah terdaftar!', 'error'); return; }
+  
+  const hashed = await hashPassword(p);
+  users.push({ username: u, pass: hashed, role: r });
+  saveUsersToStorage();
+  document.getElementById('newUser').value = '';
+  document.getElementById('newPass').value = '';
+  renderUserTable();
+  addAudit('CREATE_USER', `Membuat user baru: ${u} (${r})`);
+  showToast('✅ User ' + u + ' berhasil dibuat!', 'success');
+}
+
+function editUser(username) {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  const target = users.find(u => u.username === username);
+  if (!target) return;
+
+  document.getElementById('editUserOldName').value = target.username;
+  document.getElementById('editUserNewName').value = target.username;
+  document.getElementById('editUserNewPass').value = '';
+  document.getElementById('editUserRole').value = target.role;
+
+  if (target.username === currentUser.username) {
+    document.getElementById('editUserRole').disabled = true;
+  } else {
+    document.getElementById('editUserRole').disabled = false;
+  }
+
+  document.getElementById('editUserModal').classList.add('active');
+}
+
+function hideEditUser() {
+  document.getElementById('editUserModal').classList.remove('active');
+}
+
+async function saveEditUser() {
+  if (!isAdmin()) return;
+  const oldName = document.getElementById('editUserOldName').value;
+  const newName = document.getElementById('editUserNewName').value.trim();
+  const newPass = document.getElementById('editUserNewPass').value.trim();
+  const newRole = document.getElementById('editUserRole').value;
+
+  if (!newName) { showToast('Username tidak boleh kosong!', 'error'); return; }
+
+  if (newName !== oldName && users.some(u => u.username === newName)) {
+    showToast('Username sudah dipakai, pilih yang lain!', 'error'); return;
+  }
+
+  const idx = users.findIndex(u => u.username === oldName);
+  if (idx === -1) return;
+
+  users[idx].username = newName;
+  if (newPass) {
+    users[idx].pass = await hashPassword(newPass);
+  }
+  if (oldName !== currentUser.username) {
+    users[idx].role = newRole;
+  }
+
+  saveUsersToStorage();
+  addAudit('EDIT_USER', `Mengubah kredensial user: ${oldName} -> ${newName}`);
+
+  if (oldName === currentUser.username) {
+    currentUser.username = newName;
+    if (newPass) currentUser.pass = users[idx].pass;
+    sessionStorage.setItem('stock_user', JSON.stringify(currentUser));
+    updateUI();
+  }
+
+  hideEditUser();
+  renderUserTable();
+  showToast('✅ Kredensial User berhasil diperbarui!', 'success');
+}
+
+function deleteUser(username) {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  if (username === currentUser.username) { showToast('Tidak bisa menghapus akun yang sedang Anda gunakan!', 'error'); return; }
+  
+  if (confirm('Hapus user ' + username + '?')) {
+    users = users.filter(x => x.username !== username);
+    saveUsersToStorage();
+    renderUserTable();
+    addAudit('DELETE_USER', `Menghapus user: ${username}`);
+    showToast('✅ User ' + username + ' dihapus!', 'success');
+  }
+}
+
+function renderUserTable() {
+  const tbody = document.getElementById('userTable');
+  if (!tbody) return;
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td>${u.username}</td>
+      <td><span class="badge ${u.role === 'admin' ? 'ok' : 'warn'}">${u.role.toUpperCase()}</span></td>
+      <td>
+        <button class="btn" style="padding:2px 8px; font-size:10px;" onclick="editUser('${u.username}')">✏️ Edit</button>
+        ${(currentUser && u.username !== currentUser.username) ? `<button class="btn btn-danger" style="padding:2px 8px; font-size:10px;" onclick="deleteUser('${u.username}')">🗑️ Hapus</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function saveGerai() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const nama = document.getElementById('newGeraiNama').value.trim();
+  const lokasi = document.getElementById('newGeraiLokasi').value.trim();
+  if (!nama) { showToast('Nama gerai harus diisi!', 'error'); return; }
+  if (data.gerai.includes(nama)) { showToast('Gerai sudah terdaftar!', 'error'); return; }
+
+  data.gerai.push(nama);
+  saveData();
+  addAudit('CREATE_GERAI', `Menambah gerai baru: ${nama} (${lokasi})`);
+  document.getElementById('newGeraiNama').value = '';
+  document.getElementById('newGeraiLokasi').value = '';
+  refreshAll();
+  showToast('✅ Gerai berhasil ditambahkan!', 'success');
+}
+
+function deleteGerai(nama) {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  if (data.gerai.length <= 1) { showToast('Minimal harus ada 1 gerai!', 'error'); return; }
+  if (confirm(`Hapus gerai ${nama}?`)) {
+    data.gerai = data.gerai.filter(g => g !== nama);
+    saveData();
+    addAudit('DELETE_GERAI', `Menghapus gerai: ${nama}`);
+    refreshAll();
+    showToast('✅ Gerai berhasil dihapus!', 'success');
+  }
+}
+
+function showPanel(dash) {
+  const panels = {
+    grafik: 'panelGrafik',
+    gerai: 'panelGerai',
+    audit: 'panelAudit',
+    stok_harian: 'panelStokHarian',
+    transfer: 'panelTransfer',
+    upload: 'panelUpload',
+    opname: 'panelOpname',
+    master: 'panelMaster',
+    input: 'panelInput',
+    users: 'panelUsers'
+  };
+  document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+  const panelId = panels[dash];
+  if (panelId) {
+    document.getElementById(panelId).classList.remove('hidden');
+  }
+
+  const isMainWarehouse = ['ho', 'agen', 'return'].includes(dash);
+  const kpiRow = document.getElementById('kpiRow');
+  const chartsSection = document.getElementById('chartsSection');
+  const exportLogPanel = document.getElementById('exportLogPanel');
+
+  if (kpiRow) kpiRow.style.display = isMainWarehouse ? 'grid' : 'none';
+  if (chartsSection) chartsSection.style.display = isMainWarehouse ? 'block' : 'none';
+  if (exportLogPanel) exportLogPanel.style.display = isMainWarehouse ? 'flex' : 'none';
+}
+
+function renderKPIs() {
+  const targetKey = activeDash === 'ho' ? 'ho' : activeDash === 'agen' ? 'agen' : 'return';
+  const items = data[targetKey] || [];
+  const crit = items.filter(i => i.status === 'crit').length;
+  const total = items.length;
+  const totalStok = items.reduce((s, i) => s + num(i.akhir), 0);
+
+  document.querySelector('.kpi:nth-child(1) .value').textContent = fmt(crit);
+  document.querySelector('.kpi:nth-child(1) .label').textContent = 'Item Kritis (' + activeDash.toUpperCase() + ')';
+  document.querySelector('.kpi:nth-child(2) .value').textContent = fmt(total);
+  document.querySelector('.kpi:nth-child(2) .label').textContent = 'Total Item (' + activeDash.toUpperCase() + ')';
+  document.querySelector('.kpi:nth-child(3) .value').textContent = fmt(totalStok);
+  document.querySelector('.kpi:nth-child(3) .label').textContent = 'Total Stok';
+}
+
+function renderTabs() {
+  const tabBar = document.getElementById('tabBar');
+  const exportPanel = document.getElementById('exportLogPanel');
+  if (!tabBar) return;
+
+  const nonStandardDashboards = ['grafik', 'gerai', 'audit', 'stok_harian', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  if (nonStandardDashboards.includes(activeDash)) {
+    tabBar.style.display = 'none';
+    if (exportPanel) exportPanel.style.display = 'none';
+    tabBar.innerHTML = '';
+    return;
+  } else {
+    tabBar.style.display = 'flex';
+    if (exportPanel) exportPanel.style.display = 'flex';
+  }
+
+  let tabs = [];
+  if (activeDash === 'ho') tabs = ['master_ho', 'ho', 'logs_ho'];
+  else if (activeDash === 'agen') tabs = ['master_agen', 'agen', 'logs_agen'];
+  else if (activeDash === 'return') tabs = ['master_return', 'return', 'logs_return'];
+  else tabs = ['ho', 'agen', 'return', 'logs_all'];
+
+  const tabLabels = {
+    ho: '🏢 Stok HO',
+    agen: '🏪 Stok AGEN',
+    return: '📦 Stok RETURN',
+    master_ho: '📋 Master HO',
+    master_agen: '📋 Master AGEN',
+    master_return: '📋 Master RETURN',
+    logs_ho: '📝 Log HO',
+    logs_agen: '📝 Log AGEN',
+    logs_return: '📝 Log RETURN',
+    logs_all: '📝 Semua Log'
+  };
+
+  if (!tabs.includes(activeTab)) activeTab = tabs[0];
+
+  tabBar.innerHTML = tabs.map(t => `
+    <button class="tab-btn ${t === activeTab ? 'active' : ''}" onclick="switchTab('${t}')">
+      ${tabLabels[t] || t}
+      <span class="count">${getTabCount(t)}</span>
+    </button>
+  `).join('');
+}
+
+function getTabCount(tab) {
+  if (tab === 'ho') return data.ho.length;
+  if (tab === 'agen') return data.agen.length;
+  if (tab === 'return') return data.return.length;
+  if (tab === 'master_ho') return getMasterByStatus('HO').length;
+  if (tab === 'master_agen') return getMasterByStatus('AGEN').length;
+  if (tab === 'master_return') return getMasterByStatus('RETURN').length;
+  if (tab === 'logs_ho') return getLogsByStatus('HO').length;
+  if (tab === 'logs_agen') return getLogsByStatus('AGEN').length;
+  if (tab === 'logs_return') return getLogsByStatus('RETURN').length;
+  if (tab === 'logs_all') return data.logs.length;
+  return 0;
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  currentPage = 1;
+  renderTabs();
+  renderChartsContainer();
+  renderContent();
+}
+
+function isLogTab(tab) {
+  return tab.startsWith('logs_');
+}
+
+function resetTableDateFilter() {
+  document.getElementById('tableFilterStart').value = '';
+  document.getElementById('tableFilterEnd').value = '';
+  currentPage = 1;
+  renderContent();
+}
+
+function toggleSelectAllLogs(masterCheckbox) {
+  const checkboxes = document.querySelectorAll('.log-checkbox');
+  checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+  updateBulkToolbar();
+}
+
+function updateBulkToolbar() {
+  const checked = document.querySelectorAll('.log-checkbox:checked');
+  const toolbar = document.getElementById('bulkToolbar');
+  const info = document.getElementById('selectedLogInfo');
+  if (!toolbar || !info) return;
+
+  if (checked.length > 0 && isLoggedIn()) {
+    toolbar.classList.remove('hidden');
+    info.textContent = `${checked.length} log transaksi dipilih`;
+  } else {
+    toolbar.classList.add('hidden');
+  }
+}
+
+function printLog(id) {
+  const item = data.logs.find(l => l.id === id);
+  if (!item) { showToast('Data transaksi tidak ditemukan!', 'error'); return; }
+
+  const printWindow = window.open('', '_blank', 'width=700,height=600');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Bukti Transaksi - ${item.ticket}</title>
+      <style>
+        body { font-family: monospace; padding: 20px; color: #000; }
+        .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 15px; }
+        .info { margin-bottom: 15px; font-size: 14px; }
+        .table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
+        .table th, .table td { border: 1px solid #000; padding: 8px; text-align: left; }
+        .footer { text-align: center; margin-top: 30px; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2>BUKTI TRANSAKSI STOK</h2>
+        <p>Live Stock Control System</p>
+      </div>
+      <div class="info">
+        <p><strong>No. Tiket:</strong> ${item.ticket}</p>
+        <p><strong>Tanggal:</strong> ${formatDateSimple(item.tanggal)}</p>
+        <p><strong>Gudang / Status:</strong> ${item.status}</p>
+        <p><strong>Gerai:</strong> ${item.gerai || '-'}</p>
+        <p><strong>Operator / User:</strong> ${item.user || 'System'}</p>
+      </div>
+      <table class="table">
+        <tr><th>Kode Item</th><th>Nama Barang</th><th>Masuk (In)</th><th>Keluar (Out)</th></tr>
+        <tr>
+          <td>${item.kode}</td>
+          <td>${item.item}</td>
+          <td>${item.in}</td>
+          <td>${item.out}</td>
+        </tr>
+      </table>
+      <p><strong>Keterangan:</strong> ${item.ket || '-'}</p>
+      <div class="footer">
+        <p>Dicetak otomatis oleh Sistem Stok</p>
+      </div>
+      <script>
+        window.onload = function() { window.print(); window.close(); }
+      <\/script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+async function deleteSelectedLogs() {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  const checked = document.querySelectorAll('.log-checkbox:checked');
+  if (checked.length === 0) return;
+
+  if (!confirm(`Hapus ${checked.length} log transaksi yang dipilih secara permanen dengan cepat?`)) return;
+
+  setStatus('syncing', 'DELETING...');
+  const idsToDelete = Array.from(checked).map(cb => cb.value);
+
+  for (let id of idsToDelete) {
+    const idx = data.logs.findIndex(l => l.id === id);
+    if (idx !== -1) {
+      const logItem = data.logs[idx];
+      let targetKey = 'ho';
+      const s = getNormalizedStatus(logItem.status);
+      if (s === 'AGEN') targetKey = 'agen';
+      else if (s === 'RETURN') targetKey = 'return';
+
+      const stock = data[targetKey].find(i => i.kode === logItem.kode);
+      if (stock) {
+        stock.akhir -= num(logItem.in);
+        stock.akhir += num(logItem.out);
+      }
+      data.logs.splice(idx, 1);
+    }
+  }
+
+  recalculateStok();
+  saveData();
+  addAudit('BULK_DELETE_LOG', `Menghapus ${idsToDelete.length} log transaksi secara massal`);
+
+  try {
+    await syncBulkDeleteToGAS('Log_Transaksi', idsToDelete);
+  } catch (err) {
+    console.error('Gagal hapus sync GAS:', err);
+  }
+
+  refreshAll();
+  showToast(`✅ Berhasil menghapus ${idsToDelete.length} log transaksi dengan cepat!`, 'success');
+}
+
+async function deleteLog(id) {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  if (!confirm('Hapus log transaksi ini dari sistem dan GAS?')) return;
+  
+  setStatus('syncing', 'DELETING...');
+  const idx = data.logs.findIndex(l => l.id === id);
+  if (idx === -1) { showToast('Data tidak ditemukan!', 'error'); return; }
+  
+  const logItem = data.logs[idx];
+  let targetKey = 'ho';
+  const s = getNormalizedStatus(logItem.status);
+  if (s === 'AGEN') targetKey = 'agen';
+  else if (s === 'RETURN') targetKey = 'return';
+
+  const stock = data[targetKey].find(i => i.kode === logItem.kode);
+  if (stock) {
+    stock.akhir -= num(logItem.in);
+    stock.akhir += num(logItem.out);
+  }
+  data.logs.splice(idx, 1);
+  
+  recalculateStok();
+  saveData();
+  addAudit('DELETE_LOG', `Menghapus log transaksi tiket: ${logItem.ticket} (${logItem.kode})`);
+  
+  await syncBulkDeleteToGAS('Log_Transaksi', [id]);
+  
+  refreshAll();
+  showToast('✅ Log transaksi berhasil dihapus!', 'success');
+}
+
+function renderChartsContainer() {
+  const container = document.getElementById('chartsSection');
+  if (!container) return;
+
+  if (activeDash === 'grafik' || activeDash === 'gerai' || activeDash === 'audit') {
+    container.innerHTML = '';
+    return;
+  }
+
+  const isWarehouseMainTab = ['ho', 'agen', 'return'].includes(activeTab);
+  if (!isWarehouseMainTab) {
+    container.innerHTML = '';
+    if (warehouseHealthChartInstance) { warehouseHealthChartInstance.destroy(); warehouseHealthChartInstance = null; }
+    if (warehouseOutflowChartInstance) { warehouseOutflowChartInstance.destroy(); warehouseOutflowChartInstance = null; }
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="analytics-grid">
+      <div class="chart-card">
+        <h4>🟢 Kesehatan Stok (${activeTab.toUpperCase()})</h4>
+        <div class="chart-container">
+          <canvas id="warehouseHealthChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h4>🔥 Top 5 Pengeluaran Terbanyak (${activeTab.toUpperCase()})</h4>
+        <div class="chart-container">
+          <canvas id="warehouseOutflowChart"></canvas>
+        </div>
+      </div>
+    </div>
+  `;
+  renderWarehouseCharts(activeTab);
+}
+
+function renderGlobalGrafikDashboard() {
+  const totalHoStock = (data.ho || []).reduce((acc, item) => acc + num(item.akhir), 0);
+  const totalAgenStock = (data.agen || []).reduce((acc, item) => acc + num(item.akhir), 0);
+  const totalReturnStock = (data.return || []).reduce((acc, item) => acc + num(item.akhir), 0);
+
+  setTimeout(() => {
+    if (typeof Chart === 'undefined') {
+      console.warn('Chart.js is not loaded. Displaying fallback message for global charts.');
+      ['grafikGlobalStockWarehouse', 'grafikGlobalDailyTrx', 'grafikGlobalTopProducts'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.parentElement.innerHTML = '<div style="color: #8b949e; font-size: 11px; text-align: center; padding: 40px 20px;">⚠️ Grafik analitik tidak dapat dimuat (CDN Chart.js terblokir/offline)</div>';
+        }
+      });
+      return;
+    }
+    const ctxStockWh = document.getElementById('grafikGlobalStockWarehouse')?.getContext('2d');
+    if (ctxStockWh) {
+      if (grafikGlobalStockWarehouseInstance) grafikGlobalStockWarehouseInstance.destroy();
+      grafikGlobalStockWarehouseInstance = new Chart(ctxStockWh, {
+        type: 'bar',
+        data: {
+          labels: ['Gudang HO', 'Gudang AGEN', 'Gudang RETURN'],
+          datasets: [{
+            label: 'Total Stok',
+            data: [totalHoStock, totalAgenStock, totalReturnStock],
+            backgroundColor: ['#f2a93b', '#58a6ff', '#f85149'],
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { display: false } },
+            y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
+          }
+        }
+      });
+    }
+
+    let dailyMap = {};
+    (data.logs || []).forEach(l => {
+      let dStr = formatYMD(l.tanggal);
+      if (!dailyMap[dStr]) dailyMap[dStr] = { in: 0, out: 0 };
+      dailyMap[dStr].in += num(l.in);
+      dailyMap[dStr].out += num(l.out);
+    });
+
+    let sortedDates = Object.keys(dailyMap).sort();
+    let dailyInVals = sortedDates.map(d => dailyMap[d].in);
+    let dailyOutVals = sortedDates.map(d => dailyMap[d].out);
+    let formattedDates = sortedDates.map(d => formatDateSimple(d));
+
+    const ctxDailyTrx = document.getElementById('grafikGlobalDailyTrx')?.getContext('2d');
+    if (ctxDailyTrx) {
+      if (grafikGlobalDailyTrxInstance) grafikGlobalDailyTrxInstance.destroy();
+      grafikGlobalDailyTrxInstance = new Chart(ctxDailyTrx, {
+        type: 'line',
+        data: {
+          labels: formattedDates.length > 0 ? formattedDates : ['Belum ada data'],
+          datasets: [
+            {
+              label: 'Total Masuk (In)',
+              data: dailyInVals.length > 0 ? dailyInVals : [0],
+              borderColor: '#3fb950',
+              backgroundColor: '#3fb95022',
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'Total Keluar (Out)',
+              data: dailyOutVals.length > 0 ? dailyOutVals : [0],
+              borderColor: '#f85149',
+              backgroundColor: '#f8514922',
+              tension: 0.3,
+              fill: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#c9d1d9', font: { size: 10 }, boxWidth: 10 } }
+          },
+          scales: {
+            x: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { display: false } },
+            y: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: '#21262d' } }
+          }
+        }
+      });
+    }
+
+    let productMovementMap = {};
+    (data.logs || []).forEach(l => {
+      let pName = l.item || l.kode || 'Unknown';
+      let totalQty = num(l.in) + num(l.out);
+      productMovementMap[pName] = (productMovementMap[pName] || 0) + totalQty;
+    });
+
+    let sortedProducts = Object.entries(productMovementMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    let topProdLabels = sortedProducts.map(x => x[0]);
+    let topProdValues = sortedProducts.map(x => x[1]);
+
+    const ctxTopProd = document.getElementById('grafikGlobalTopProducts')?.getContext('2d');
+    if (ctxTopProd) {
+      if (grafikGlobalTopProductsInstance) grafikGlobalTopProductsInstance.destroy();
+      grafikGlobalTopProductsInstance = new Chart(ctxTopProd, {
+        type: 'bar',
+        data: {
+          labels: topProdLabels.length > 0 ? topProdLabels : ['Belum ada data pergerakan barang'],
+          datasets: [{
+            label: 'Total Pergerakan (In + Out)',
+            data: topProdValues.length > 0 ? topProdValues : [0],
+            backgroundColor: '#f2a93b',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+            y: { ticks: { color: '#c9d1d9', font: { size: 10 } }, grid: { display: false } }
+          }
+        }
+      });
+    }
+  }, 50);
+}
+
+function changePage(direction) {
+  currentPage += direction;
+  renderContent();
+  const scrollContainer = document.querySelector('.scroll');
+  if (scrollContainer) scrollContainer.scrollTop = 0;
+}
+
+function renderContent() {
+  const container = document.getElementById('tableContent');
+  const tableToolbarSection = document.getElementById('tableToolbarSection');
+  const toolbar = document.getElementById('bulkToolbar');
+  const dateFilterBox = document.getElementById('tableDateFilterContainer');
+  const paginationBar = document.querySelector('.pagination-bar');
+  
+  if (!container) return;
+
+  const nonTableDashboards = ['grafik', 'gerai', 'audit', 'stok_harian', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  if (nonTableDashboards.includes(activeDash)) {
+    container.innerHTML = '';
+    if (tableToolbarSection) tableToolbarSection.classList.add('hidden');
+    if (paginationBar) paginationBar.style.display = 'none';
+    return;
+  } else {
+    if (tableToolbarSection) tableToolbarSection.classList.remove('hidden');
+    if (paginationBar) paginationBar.style.display = 'flex';
+  }
+
+  if (dateFilterBox) {
+    if (isLogTab(activeTab)) {
+      dateFilterBox.style.display = 'flex';
+    } else {
+      dateFilterBox.style.display = 'none';
+    }
+  }
+
+  if (toolbar && !isLogTab(activeTab)) {
+    toolbar.classList.add('hidden');
+  }
+
+  let rows = [];
+  let cols = [];
+
+  if (activeDash === 'audit') {
+    rows = data.audit || [];
+    cols = [
+      {key: 'time', label: 'Waktu', type: 'text'},
+      {key: 'user', label: 'User / Operator', type: 'text'},
+      {key: 'action', label: 'Aksi / Event', type: 'mono'},
+      {key: 'detail', label: 'Detail Perubahan', type: 'text'}
+    ];
+  } else if (activeTab === 'ho' || activeTab === 'agen' || activeTab === 'return') {
+    const key = activeTab;
+    rows = data[key] || [];
+    cols = [
+      {key: 'no', label: 'No', type: 'text'},
+      {key: 'kode', label: 'Kode', type: 'mono'},
+      {key: 'item', label: 'Item', type: 'text'},
+      {key: 'satuan', label: 'Satuan', type: 'text'},
+      {key: 'awal', label: 'Awal', type: 'num'},
+      {key: 'buffer', label: 'Buffer', type: 'num'},
+      {key: 'totalIn', label: 'Total In', type: 'num_in'},
+      {key: 'totalOut', label: 'Total Out', type: 'num_out'},
+      {key: 'akhir', label: 'Akhir', type: 'num'},
+      {key: 'status', label: 'Status', type: 'status'}
+    ];
+  } else if (activeTab === 'master_ho' || activeTab === 'master_agen' || activeTab === 'master_return') {
+    const status = activeTab.replace('master_', '').toUpperCase();
+    rows = getMasterByStatus(status);
+    cols = [
+      {key: 'kode', label: 'Kode', type: 'mono'},
+      {key: 'item', label: 'Nama', type: 'text'},
+      {key: 'satuan', label: 'Satuan', type: 'text'},
+      {key: 'buffer', label: 'Buffer', type: 'num'},
+      {key: 'awal', label: 'Stok Awal', type: 'num'},
+      {key: 'action', label: 'Aksi', type: 'action_master'}
+    ];
+  } else if (activeTab === 'logs_ho' || activeTab === 'logs_agen' || activeTab === 'logs_return') {
+    const status = activeTab.replace('logs_', '').toUpperCase();
+    rows = getLogsByStatus(status).sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
+    cols = [
+      {key: 'checkbox', label: '<input type="checkbox" id="selectAllLogs" onclick="toggleSelectAllLogs(this)">', type: 'checkbox'},
+      {key: 'tanggal', label: 'Tanggal', type: 'date_simple'},
+      {key: 'ticket', label: 'Ticket', type: 'mono'},
+      {key: 'kode', label: 'Kode', type: 'mono'},
+      {key: 'item', label: 'Barang', type: 'text'},
+      {key: 'in', label: 'In', type: 'num_in_log'},
+      {key: 'out', label: 'Out', type: 'num_out_log'},
+      {key: 'gerai', label: 'Gerai', type: 'text'},
+      {key: 'ket', label: 'Keterangan', type: 'text'},
+      {key: 'user', label: 'User', type: 'text'},
+      {key: 'action', label: 'Aksi', type: 'action_log'}
+    ];
+  } else if (activeTab === 'logs_all') {
+    rows = data.logs.sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
+    cols = [
+      {key: 'checkbox', label: '<input type="checkbox" id="selectAllLogs" onclick="toggleSelectAllLogs(this)">', type: 'checkbox'},
+      {key: 'tanggal', label: 'Tanggal', type: 'date_simple'},
+      {key: 'ticket', label: 'Ticket', type: 'mono'},
+      {key: 'kode', label: 'Kode', type: 'mono'},
+      {key: 'item', label: 'Barang', type: 'text'},
+      {key: 'status', label: 'Status', type: 'text'},
+      {key: 'in', label: 'In', type: 'num_in_log'},
+      {key: 'out', label: 'Out', type: 'num_out_log'},
+      {key: 'gerai', label: 'Gerai', type: 'text'},
+      {key: 'ket', label: 'Keterangan', type: 'text'},
+      {key: 'user', label: 'User', type: 'text'},
+      {key: 'action', label: 'Aksi', type: 'action_log'}
+    ];
+  }
+
+  if (isLogTab(activeTab)) {
+    const fStartVal = document.getElementById('tableFilterStart')?.value;
+    const fEndVal = document.getElementById('tableFilterEnd')?.value;
+    if (fStartVal || fEndVal) {
+      rows = rows.filter(r => {
+        let rDate = formatYMD(r.tanggal);
+        if (fStartVal && rDate < fStartVal) return false;
+        if (fEndVal && rDate > fEndVal) return false;
+        return true;
+      });
+    }
+  }
+
+  const localSearch = (document.getElementById('localTableSearch')?.value || '').toLowerCase();
+  if (localSearch) {
+    rows = rows.filter(r => {
+      let match = Object.values(r).some(v => String(v||'').toLowerCase().includes(localSearch));
+      if (!match && r.buffer !== undefined && r.akhir !== undefined) {
+         match = getStatusText(r.buffer, r.akhir).toLowerCase().includes(localSearch);
+      }
+      return match;
+    });
+  }
+
+  const globalSearch = (document.getElementById('globalSearch')?.value || '').toLowerCase();
+  if (globalSearch) {
+    rows = rows.filter(r => {
+      let match = Object.values(r).some(v => String(v||'').toLowerCase().includes(globalSearch));
+      if (!match && r.buffer !== undefined && r.akhir !== undefined) {
+         match = getStatusText(r.buffer, r.akhir).toLowerCase().includes(globalSearch);
+      }
+      return match;
+    });
+  }
+
+  const totalRows = rows.length;
+  const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const paginatedRows = rows.slice(startIndex, startIndex + rowsPerPage);
+
+  let html = '<div class="table-wrap"><div class="scroll"><table><thead><tr>';
+  cols.forEach(c => {
+    let thCls = c.type === 'num' || c.type === 'num_in' || c.type === 'num_out' || c.type === 'num_in_log' || c.type === 'num_out_log' ? 'text-right' : '';
+    if (c.key === 'no') thCls += ' col-no';
+    else if (c.key === 'kode') thCls += ' col-kode';
+    else if (c.key === 'item') thCls += ' col-item';
+    else if (c.key === 'satuan') thCls += ' col-satuan';
+    else if (c.key === 'status') thCls += ' col-status';
+    else if (c.key === 'checkbox') thCls += ' col-checkbox';
+    else if (c.key === 'tanggal') thCls += ' col-tanggal';
+    else if (c.key === 'ticket') thCls += ' col-ticket';
+    else if (c.key === 'in') thCls += ' col-in';
+    else if (c.key === 'out') thCls += ' col-out';
+    else if (c.key === 'gerai') thCls += ' col-gerai';
+    else if (c.key === 'ket') thCls += ' col-ket';
+    else if (c.key === 'user') thCls += ' col-user';
+    else if (c.key === 'action') thCls += ' col-action';
+    html += `<th class="${thCls.trim()}">${c.label}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  if (paginatedRows.length === 0) {
+    html += '<tr><td colspan="' + cols.length + '" class="text-muted text-center" style="padding:15px;">Tidak ada data</td></tr>';
+  } else {
+    paginatedRows.forEach(r => {
+      html += '<tr>';
+      cols.forEach(c => {
+        let val = r[c.key] !== undefined ? r[c.key] : '—';
+        let tdCls = c.type === 'num' || c.type === 'num_in' || c.type === 'num_out' || c.type === 'num_in_log' || c.type === 'num_out_log' ? 'text-right' : '';
+        if (c.key === 'no') tdCls += ' col-no';
+        else if (c.key === 'kode') tdCls += ' col-kode';
+        else if (c.key === 'item') tdCls += ' col-item';
+        else if (c.key === 'satuan') tdCls += ' col-satuan';
+        else if (c.key === 'status') tdCls += ' col-status';
+        else if (c.key === 'checkbox') tdCls += ' col-checkbox';
+        else if (c.key === 'tanggal') tdCls += ' col-tanggal';
+        else if (c.key === 'ticket') tdCls += ' col-ticket';
+        else if (c.key === 'in') tdCls += ' col-in';
+        else if (c.key === 'out') tdCls += ' col-out';
+        else if (c.key === 'gerai') tdCls += ' col-gerai';
+        else if (c.key === 'ket') tdCls += ' col-ket';
+        else if (c.key === 'user') tdCls += ' col-user';
+        else if (c.key === 'action') tdCls += ' col-action';
+
+        let content = val;
+
+        if (c.type === 'checkbox') {
+          content = `<input type="checkbox" class="log-checkbox" value="${r.id}" onclick="updateBulkToolbar()">`;
+        } else if (c.key === 'user') {
+          content = `<span class="badge warn" style="font-size:9px;">${val || 'System'}</span>`;
+        } else if (c.type === 'date_simple') {
+          content = formatDateSimple(val); 
+        } else if (c.type === 'mono') {
+          content = '<span class="text-muted" style="font-family:monospace;">' + val + '</span>';
+        } else if (c.type === 'status') {
+          const badge = val || 'ok';
+          content = '<span class="badge ' + badge + '">' + getStatusText(r.buffer, r.akhir) + '</span>';
+        } else if (c.type === 'num') {
+          content = fmt(val);
+        } else if (c.type === 'num_in' || c.type === 'num_in_log') {
+          content = (val !== '-' && val !== '' && num(val) > 0) ? '+' + fmt(val) : '—';
+          if (val !== '-' && val !== '' && num(val) > 0) tdCls += ' text-success';
+        } else if (c.type === 'num_out' || c.type === 'num_out_log') {
+          content = (val !== '-' && val !== '' && num(val) > 0) ? '-' + fmt(val) : '—';
+          if (val !== '-' && val !== '' && num(val) > 0) tdCls += ' text-danger';
+        } else if (c.type === 'action_master') {
+          content = !isLoggedIn() ? '—' : `
+            <button class="btn" style="padding:2px 6px; font-size:10px;" onclick="editMaster('${r.id}')" title="Edit">✏️</button>
+            <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deleteMaster('${r.id}')" title="Hapus">🗑️</button>
+          `;
+        } else if (c.type === 'action_log') {
+          content = !isLoggedIn() ? '—' : `
+            <button class="btn" style="padding:2px 6px; font-size:10px; color:#58a6ff; border-color:#58a6ff;" onclick="printLog('${r.id}')" title="Cetak Bukti Transaksi">🖨️</button>
+            <button class="btn" style="padding:2px 6px; font-size:10px;" onclick="editLog('${r.id}')" title="Edit">✏️</button>
+            <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deleteLog('${r.id}')" title="Hapus">🗑️</button>
+          `;
+        }
+        html += `<td class="${tdCls.trim()}" title="${String(val).replace(/"/g, '&quot;')}">${content}</td>`;
+      });
+      html += '</tr>';
+    });
+  }
+
+  html += '</tbody></table></div></div>';
+
+  html += `
+    <div class="pagination-bar">
+      <span>Menampilkan ${totalRows === 0 ? 0 : startIndex + 1} - ${Math.min(startIndex + rowsPerPage, totalRows)} dari total ${totalRows} data</span>
+      <div class="flex" style="gap:4px;">
+        <button class="btn" style="padding:3px 8px;" onclick="changePage(-1)" ${currentPage === 1 ? 'disabled style="opacity:0.4; cursor:default;"' : ''}>◀ Prev</button>
+        <span style="padding:3px 6px; color:#f2a93b; font-weight:600;">Hal ${currentPage} / ${totalPages || 1}</span>
+        <button class="btn" style="padding:3px 8px;" onclick="changePage(1)" ${currentPage >= totalPages ? 'disabled style="opacity:0.4; cursor:default;"' : ''}>Next ▶</button>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+  populateDropdowns();
+}
+
+function exportLogByWarehouse(warehouse) {
+  const start = document.getElementById('exportStart').value;
+  const end = document.getElementById('exportEnd').value;
+
+  if (!start || !end) {
+    showToast('Pilih rentang tanggal mulai dan sampai!', 'error');
+    return;
+  }
+  if (new Date(start) > new Date(end)) {
+    showToast('Tanggal mulai tidak boleh melebihi tanggal selesai!', 'error');
+    return;
+  }
+
+  let filteredLogs = data.logs.filter(l => {
+    let stat = getNormalizedStatus(l.status);
+    if (warehouse !== 'ALL' && stat !== warehouse) return false;
+
+    let logDate = formatYMD(l.tanggal);
+    if (logDate < start || logDate > end) return false;
+    return true;
+  });
+
+  if (filteredLogs.length === 0) {
+    showToast(`Tidak ada data log untuk kategori ${warehouse} pada rentang tanggal tersebut!`, 'error');
+    return;
+  }
+
+  let exportRows = filteredLogs.map((l, idx) => ({
+    "NO": idx + 1,
+    "TANGGAL": formatExcelDate(l.tanggal),
+    "TICKET": l.ticket,
+    "KODE ITEM": l.kode,
+    "NAMA BARANG": l.item,
+    "GUDANG": l.status,
+    "MASUK (IN)": l.in,
+    "KELUAR (OUT)": l.out,
+    "GERAI": l.gerai || '-',
+    "KETERANGAN": l.ket || '-',
+    "USER / OPERATOR": l.user || 'System'
+  }));
+
+  if (typeof XLSX === 'undefined') {
+    showToast('❌ Fitur ekspor Excel tidak aktif karena CDN SheetJS (XLSX) tidak dapat dimuat!', 'error');
+    return;
+  }
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `Log_${warehouse}`);
+  XLSX.writeFile(wb, `Log_Transaksi_${warehouse}_${start}_sd_${end}.xlsx`);
+  showToast(`✅ File Excel Log ${warehouse} berhasil didownload!`, 'success');
+}
+
+function renderWarehouseCharts(warehouseKey) {
+  let amanCount = 0, waspadaCount = 0, kritisCount = 0;
+  const items = data[warehouseKey] || [];
+  
+  items.forEach(item => {
+    const b = num(item.buffer);
+    const s = num(item.akhir);
+    if (s < 0 || (b > 0 && s < b)) kritisCount++;
+    else if (b > 0 && s < b * 1.2) waspadaCount++;
+    else amanCount++;
+  });
+
+  let outflowMap = {};
+  data.logs.forEach(l => {
+    const lStat = getNormalizedStatus(l.status);
+    if (lStat === warehouseKey.toUpperCase() || (warehouseKey === 'ho' && lStat === 'HO')) {
+      const outVal = num(l.out);
+      if (outVal > 0) {
+        const itemName = l.item || l.kode || 'Lainnya';
+        outflowMap[itemName] = (outflowMap[itemName] || 0) + outVal;
+      }
+    }
+  });
+
+  let sortedOutflow = Object.entries(outflowMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  let labels = sortedOutflow.map(x => x[0]);
+  let values = sortedOutflow.map(x => x[1]);
+
+  setTimeout(() => {
+    if (typeof Chart === 'undefined') {
+      console.warn('Chart.js is not loaded. Displaying fallback message.');
+      const c1 = document.getElementById('warehouseHealthChart');
+      if (c1) {
+        c1.parentElement.innerHTML = '<div style="color: #8b949e; font-size: 11px; text-align: center; padding: 20px;">⚠️ Grafik tidak dapat dimuat (CDN Chart.js terblokir/offline)</div>';
+      }
+      const c2 = document.getElementById('warehouseOutflowChart');
+      if (c2) {
+        c2.parentElement.innerHTML = '<div style="color: #8b949e; font-size: 11px; text-align: center; padding: 20px;">⚠️ Grafik tidak dapat dimuat (CDN Chart.js terblokir/offline)</div>';
+      }
+      return;
+    }
+    const ctxHealth = document.getElementById('warehouseHealthChart')?.getContext('2d');
+    if (ctxHealth) {
+      if (warehouseHealthChartInstance) warehouseHealthChartInstance.destroy();
+      warehouseHealthChartInstance = new Chart(ctxHealth, {
+        type: 'doughnut',
+        data: {
+          labels: ['Aman', 'Waspada', 'Kritis'],
+          datasets: [{
+            data: [amanCount, waspadaCount, kritisCount],
+            backgroundColor: ['#3fb950', '#f2a93b', '#f85149'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#c9d1d9', font: { size: 10 }, boxWidth: 10 } }
+          }
+        }
+      });
+    }
+
+    const ctxOutflow = document.getElementById('warehouseOutflowChart')?.getContext('2d');
+    if (ctxOutflow) {
+      if (warehouseOutflowChartInstance) warehouseOutflowChartInstance.destroy();
+      warehouseOutflowChartInstance = new Chart(ctxOutflow, {
+        type: 'bar',
+        data: {
+          labels: labels.length > 0 ? labels : ['Belum ada data keluar'],
+          datasets: [{
+            label: 'Total Keluar',
+            data: values.length > 0 ? values : [0],
+            backgroundColor: '#58a6ff',
+            borderRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { display: false } },
+            y: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: '#21262d' } }
+          }
+        }
+      });
+    }
+  }, 50);
+}
+
+function extractKode(val) {
+  if (!val) return '';
+  let s = String(val).trim();
+  
+  // Try matching standard "[GUDANG] KODE — Nama" format
+  const matchBrackets = s.match(/^\s*\[(?:HO|AGEN|RETURN)\]\s*([^\s—]+)/i);
+  if (matchBrackets) {
+    return matchBrackets[1].trim();
+  }
+
+  // Try splitting by " — "
+  const parts = s.split(' — ');
+  if (parts.length > 1) {
+    let rawCode = parts[0].trim();
+    // remove brackets if they exist
+    return rawCode.replace(/^\[(?:HO|AGEN|RETURN)\]\s*/i, '').trim();
+  }
+
+  // Fallback: Check if string matches any actual master item code
+  if (data && data.master) {
+    const matched = data.master.find(m => m.kode.toLowerCase() === s.toLowerCase() || m.item.toLowerCase() === s.toLowerCase());
+    if (matched) return matched.kode;
+    
+    // Check if the string contains any of the master codes
+    const containsMatch = data.master.find(m => s.toLowerCase().includes(m.kode.toLowerCase()));
+    if (containsMatch) return containsMatch.kode;
+  }
+  
+  return s;
+}
+
+function populateDropdowns() {
+  const allOpts = data.master.map(m => 
+    `<option value="[${m.status}] ${m.kode} — ${m.item}"></option>`
+  ).join('');
+
+  const hoOpts = data.master.filter(m => m.status === 'HO').map(m => 
+    `<option value="[HO] ${m.kode} — ${m.item}"></option>`
+  ).join('');
+
+  const agenOpts = data.master.filter(m => m.status === 'AGEN').map(m => 
+    `<option value="[AGEN] ${m.kode} — ${m.item}"></option>`
+  ).join('');
+
+  const dlAll = document.getElementById('dlAllItems');
+  const dlHo = document.getElementById('dlHoItems');
+  const dlAgen = document.getElementById('dlAgenItems');
+
+  if (dlAll) dlAll.innerHTML = allOpts;
+  if (dlHo) dlHo.innerHTML = hoOpts;
+  if (dlAgen) dlAgen.innerHTML = agenOpts;
+
+  const geraiSelect = document.getElementById('inGerai');
+  if (geraiSelect) {
+    geraiSelect.innerHTML = (data.gerai || ['Gerai Utama']).map(g => `<option value="${g}">${g}</option>`).join('');
+  }
+}
+
+async function deleteMaster(id) {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  if (!confirm('Hapus master item ini dari sistem dan GAS?')) return;
+  const item = data.master.find(m => m.id === id);
+  if (!item) { showToast('Item tidak ditemukan!', 'error'); return; }
+  data.master = data.master.filter(m => m.id !== id);
+  const key = item.status === 'HO' ? 'ho' : item.status === 'AGEN' ? 'agen' : 'return';
+  data[key] = data[key].filter(i => i.id !== id);
+  
+  recalculateStok();
+  saveData();
+  addAudit('DELETE_MASTER', `Menghapus master item: ${item.kode} - ${item.item}`);
+  
+  const targetSheet = 'Master_' + item.status; 
+  await syncToGAS(targetSheet, null, 'delete', item.kode);
+  
+  refreshAll();
+}
+
+function editMaster(id) {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const item = data.master.find(m => m.id === id);
+  if (!item) { showToast('Item tidak ditemukan!', 'error'); return; }
+  document.getElementById('editMasterId').value = id;
+  document.getElementById('editMasterStatus').value = item.status;
+  document.getElementById('editMasterKode').value = item.kode;
+  document.getElementById('editMasterNama').value = item.item;
+  document.getElementById('editMasterSatuan').value = item.satuan;
+  document.getElementById('editMasterBuffer').value = item.buffer;
+  document.getElementById('editMasterAwal').value = item.awal;
+  document.getElementById('editMasterModal').classList.add('active');
+}
+function hideEditMaster() { document.getElementById('editMasterModal').classList.remove('active'); }
+
+async function saveEditMaster() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const id = document.getElementById('editMasterId').value;
+  const idx = data.master.findIndex(m => m.id === id);
+  if (idx === -1) { showToast('Data tidak ditemukan!', 'error'); return; }
+
+  const old = data.master[idx];
+  const newStatus = getNormalizedStatus(document.getElementById('editMasterStatus').value);
+  const newKode = document.getElementById('editMasterKode').value.trim();
+  const newNama = document.getElementById('editMasterNama').value.trim();
+  const newSatuan = document.getElementById('editMasterSatuan').value.trim();
+  const newBuffer = parseInt(document.getElementById('editMasterBuffer').value) || 0;
+  const newAwal = parseInt(document.getElementById('editMasterAwal').value) || 0;
+
+  if (!newKode || !newNama) { showToast('Kode dan Nama harus diisi!', 'error'); return; }
+
+  data.master[idx] = { ...old, kode: newKode, item: newNama, status: newStatus, satuan: newSatuan, buffer: newBuffer, awal: newAwal };
+  const oldKey = old.status === 'HO' ? 'ho' : old.status === 'AGEN' ? 'agen' : 'return';
+  const newKey = newStatus === 'HO' ? 'ho' : newStatus === 'AGEN' ? 'agen' : 'return';
+
+  data[oldKey] = data[oldKey].filter(i => i.id !== id);
+  data[newKey].push({
+    id: data.master[idx].id,
+    no: data[newKey].length + 1,
+    item: newNama,
+    kode: newKode,
+    satuan: newSatuan,
+    buffer: newBuffer,
+    awal: newAwal,
+    akhir: newAwal,
+    totalIn: 0,
+    totalOut: 0,
+    kategori: newNama.split(' ')[0] || newNama
+  });
+
+  recalculateStok();
+  saveData();
+  addAudit('EDIT_MASTER', `Mengubah master barang: ${old.kode} -> ${newKode} (${newNama})`);
+  
+  if (old.status !== newStatus) {
+    await syncToGAS('Master_' + old.status, null, 'delete', old.kode);
+    const res = await syncToGAS('Master_' + newStatus, [newKode, newNama, newStatus, newSatuan, newBuffer, newAwal], 'append');
+    if (!res.success) showToast('⚠️ Gagal sinkron perpindahan ke GAS', 'error');
+    else showToast('✅ Master barang berhasil dipindah ke ' + newStatus + '!', 'success');
+  } 
+  else {
+    const res = await syncToGAS('Master_' + newStatus, [newKode, newNama, newStatus, newSatuan, newBuffer, newAwal], 'update', old.kode);
+    if (!res.success) showToast('⚠️ Gagal sinkron update ke GAS: ' + (res.message || ''), 'error');
+    else showToast('✅ Master barang berhasil diperbarui!', 'success');
+  }
+
+  hideEditMaster();
+  refreshAll();
+}
+
+function editLog(id) {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const item = data.logs.find(l => l.id === id);
+  if (!item) { showToast('Data tidak ditemukan!', 'error'); return; }
+  document.getElementById('editLogId').value = id;
+  document.getElementById('editTgl').value = item.tanggal;
+  document.getElementById('editTicket').value = item.ticket;
+  
+  const masterObj = data.master.find(m => m.kode === item.kode);
+  const fullStr = masterObj ? `[${masterObj.status}] ${masterObj.kode} — ${masterObj.item}` : item.kode;
+  document.getElementById('editItem').value = fullStr;
+
+  const isIn = item.in !== '-' && item.in !== '';
+  document.getElementById('editJenis').value = isIn ? 'in' : 'out';
+  document.getElementById('editQty').value = isIn ? item.in : item.out;
+  document.getElementById('editGerai').value = item.gerai || '';
+  document.getElementById('editKet').value = item.ket || '';
+  document.getElementById('editLogModal').classList.add('active');
+}
+function hideEditLog() { document.getElementById('editLogModal').classList.remove('active'); }
+
+async function saveEditLog() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const id = document.getElementById('editLogId').value;
+  const idx = data.logs.findIndex(l => l.id === id);
+  if (idx === -1) { showToast('Data tidak ditemukan!', 'error'); return; }
+
+  const old = data.logs[idx];
+  const newTgl = document.getElementById('editTgl').value;
+  const newTicket = document.getElementById('editTicket').value;
+  const newKode = extractKode(document.getElementById('editItem').value);
+  const newJenis = document.getElementById('editJenis').value;
+  const newQty = parseInt(document.getElementById('editQty').value) || 0;
+  const newGerai = document.getElementById('editGerai').value || '';
+  const newKet = document.getElementById('editKet').value || '';
+
+  if (newQty <= 0) { showToast('QTY harus lebih dari 0!', 'error'); return; }
+
+  const master = data.master.find(m => m.kode === newKode);
+  if (!master) { showToast('Item tidak ditemukan! Pilih item dari daftar yang tersedia.', 'error'); return; }
+
+  let oldKey = 'ho';
+  const oldStat = getNormalizedStatus(old.status);
+  if (oldStat === 'AGEN') oldKey = 'agen';
+  else if (oldStat === 'RETURN') oldKey = 'return';
+
+  // Prevent Negative Stock on editing transaction
+  let newKey = 'ho';
+  const newStat = getNormalizedStatus(master.status);
+  if (newStat === 'AGEN') newKey = 'agen';
+  else if (newStat === 'RETURN') newKey = 'return';
+
+  const oldStock = data[oldKey].find(i => i.kode === old.kode);
+  const newStock = data[newKey].find(i => i.kode === newKode);
+
+  if (newStock) {
+    let simStock = newStock.akhir;
+    if (old.kode === newKode) {
+      simStock = simStock - num(old.in) + num(old.out);
+    }
+    const simIn = newJenis === 'in' ? newQty : 0;
+    const simOut = newJenis === 'out' ? newQty : 0;
+    simStock = simStock + simIn - simOut;
+
+    if (simStock < 0) {
+      showToast(`❌ Transaksi dibatalkan! Akan menyebabkan stok negatif (${simStock}) pada item ${newKode}!`, 'error');
+      return;
+    }
+  }
+
+  if (oldStock) {
+    oldStock.akhir -= num(old.in);
+    oldStock.akhir += num(old.out);
+  }
+
+  const inVal = newJenis === 'in' ? newQty : '-';
+  const outVal = newJenis === 'out' ? newQty : '-';
+  const actor = currentUser ? currentUser.username : 'System';
+
+  data.logs[idx] = {
+    ...old,
+    tanggal: newTgl,
+    ticket: newTicket,
+    kode: newKode,
+    item: master.item,
+    status: master.status,
+    in: inVal,
+    out: outVal,
+    gerai: newGerai,
+    ket: newKet,
+    user: actor
+  };
+
+  if (newStock) {
+    newStock.akhir += num(inVal);
+    newStock.akhir -= num(outVal);
+  }
+
+  recalculateStok();
+  saveData();
+  addAudit('EDIT_LOG', `Mengubah transaksi tiket: ${newTicket} (${newKode})`);
+  
+  showToast('⏳ Menyimpan Perubahan...', 'info');
+  const res = await syncToGAS('Log_Transaksi', [id, newTgl, newTicket, newKode, master.item, master.status, inVal, outVal, newGerai, newKet, actor], 'update', id);
+  
+  hideEditLog();
+  refreshAll();
+
+  if (res && res.isOffline) {
+    showToast('⚠️ Offline: Perubahan disimpan lokal & masuk antrean sinkronisasi!', 'warn');
+  } else if (res && res.success) {
+    showToast('✅ Transaksi berhasil diperbarui & disinkronkan!', 'success');
+  } else {
+    showToast('❌ Gagal menyimpan perubahan transaksi!', 'error');
+  }
+}
+
+async function saveMaster() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const status = getNormalizedStatus(document.getElementById('mStatus').value);
+  const kode = document.getElementById('mKode').value.trim();
+  const nama = document.getElementById('mNama').value.trim();
+  const satuan = document.getElementById('mSatuan').value.trim() || 'PCS';
+  const buffer = parseInt(document.getElementById('mBuffer').value) || 0;
+  const awal = parseInt(document.getElementById('mAwal').value) || 0;
+
+  if (!kode || !nama) { showToast('Kode dan Nama harus diisi!', 'error'); return; }
+
+  // Prevent duplicate code in master
+  if (data.master.some(m => m.kode.toLowerCase() === kode.toLowerCase())) {
+    showToast('❌ Kode barang sudah terdaftar!', 'error');
+    return;
+  }
+
+  const id = genId();
+  data.master.push({ id, kode, item: nama, status, satuan, buffer, awal });
+  const key = status === 'HO' ? 'ho' : status === 'AGEN' ? 'agen' : 'return';
+  data[key].push({
+    id,
+    no: data[key].length + 1,
+    item: nama,
+    kode,
+    satuan,
+    buffer,
+    awal,
+    akhir: awal,
+    totalIn: 0,
+    totalOut: 0,
+    kategori: nama.split(' ')[0] || nama
+  });
+
+  recalculateStok();
+  saveData();
+  addAudit('CREATE_MASTER', `Menambah master item baru: ${kode} - ${nama} (${status})`);
+  
+  showToast('⏳ Menyimpan Master Baru...', 'info');
+  const targetSheet = 'Master_' + status; 
+  const res = await syncToGAS(targetSheet, [kode, nama, status, satuan, buffer, awal], 'append');
+  
+  refreshAll();
+  document.getElementById('mKode').value = '';
+  document.getElementById('mNama').value = '';
+  
+  if (res && res.isOffline) {
+    showToast('⚠️ Offline: Master disimpan lokal & masuk antrean sinkronisasi!', 'warn');
+  } else if (res && res.success) {
+    showToast('✅ Item berhasil ditambahkan & disinkronkan ke ' + status + '!', 'success');
+  } else {
+    showToast('❌ Gagal menambahkan item master!', 'error');
+  }
+}
+
+async function submitTrx() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const tgl = document.getElementById('inTgl').value;
+  const ticket = document.getElementById('inTicket').value.trim() || 'HT-' + Date.now().toString().slice(-6);
+  const kode = extractKode(document.getElementById('inItem').value);
+  const jenis = document.getElementById('inJenis').value;
+  const qty = parseInt(document.getElementById('inQty').value) || 0;
+  const gerai = document.getElementById('inGerai').value || 'Gerai Utama';
+
+  if (!kode) { showToast('Pilih barang terlebih dahulu!', 'error'); return; }
+  if (qty <= 0) { showToast('QTY harus lebih dari 0!', 'error'); return; }
+
+  const master = data.master.find(m => m.kode === kode);
+  if (!master) { showToast('Item tidak ditemukan! Pilih item dari daftar.', 'error'); return; }
+
+  const stat = getNormalizedStatus(master.status);
+  const key = stat === 'HO' ? 'ho' : stat === 'AGEN' ? 'agen' : 'return';
+  const stock = data[key].find(i => i.kode === kode);
+  if (!stock) { showToast('Stok tidak ditemukan!', 'error'); return; }
+
+  if (jenis === 'out' && qty > stock.akhir) {
+    showToast('Stok tidak cukup! Tersedia: ' + stock.akhir, 'error');
+    return;
+  }
+
+  const id = genId();
+  const inVal = jenis === 'in' ? qty : '-';
+  const outVal = jenis === 'out' ? qty : '-';
+  const actor = currentUser ? currentUser.username : 'System';
+
+  data.logs.push({
+    id, tanggal: tgl, ticket, kode,
+    item: master.item, status: stat,
+    in: inVal, out: outVal, gerai, ket: '-', user: actor
+  });
+
+  recalculateStok();
+  saveData();
+  addAudit('INPUT_TRX', `Input transaksi ${jenis.toUpperCase()} (${qty}) ${kode} untuk gerai ${gerai}`);
+  
+  showToast('⏳ Menyimpan ke Cloud...', 'info');
+  const res = await syncToGAS('Log_Transaksi', [id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, '-', actor], 'append');
+  
+  refreshAll();
+  document.getElementById('inQty').value = '';
+  document.getElementById('inItem').value = '';
+  
+  if (res && res.isOffline) {
+    showToast('⚠️ Offline: Transaksi disimpan lokal & masuk antrean sinkronisasi!', 'warn');
+  } else if (res && res.success) {
+    showToast('✅ Transaksi berhasil disimpan & disinkronkan!', 'success');
+  } else {
+    showToast('❌ Gagal menyimpan transaksi!', 'error');
+  }
+}
+
+async function processTransfer() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const tgl = document.getElementById('trfTgl').value;
+  const ticket = document.getElementById('trfTicket').value.trim() || 'TRF-' + Date.now().toString().slice(-6);
+  const arah = document.getElementById('trfArah').value;
+  const qty = parseInt(document.getElementById('trfQty').value) || 0;
+  const ket = document.getElementById('trfKet').value.trim() || '-';
+
+  if (qty <= 0) { showToast('QTY harus lebih dari 0!', 'error'); return; }
+
+  const hoKode = extractKode(document.getElementById('trfHoItem').value);
+  const agenKode = extractKode(document.getElementById('trfAgenItem').value);
+
+  if (!hoKode || !agenKode) { showToast('Pilih barang HO dan AGEN dengan benar!', 'error'); return; }
+
+  const hoStock = data.ho.find(i => i.kode === hoKode);
+  const agenStock = data.agen.find(i => i.kode === agenKode);
+
+  if (!hoStock) { showToast('Barang HO tidak ditemukan!', 'error'); return; }
+  if (!agenStock) { showToast('Barang AGEN tidak ditemukan!', 'error'); return; }
+
+  let logOut, logIn;
+  const idOut = genId() + 'A';
+  const idIn = genId() + 'B';
+  const actor = currentUser ? currentUser.username : 'System';
+
+  if (arah === 'HO_AGEN') {
+    if (qty > hoStock.akhir) { showToast('Stok HO tidak cukup!', 'error'); return; }
+
+    logOut = {
+      id: idOut, tanggal: tgl, ticket, kode: hoKode, item: hoStock.item, 
+      status: 'HO', in: '-', out: qty, gerai: 'INTERNAL', ket: 'Trf out ke AGEN | ' + ket, user: actor
+    };
+    logIn = {
+      id: idIn, tanggal: tgl, ticket, kode: agenKode, item: agenStock.item, 
+      status: 'AGEN', in: qty, out: '-', gerai: 'INTERNAL', ket: 'Trf in dari HO | ' + ket, user: actor
+    };
+
+  } else { 
+    if (qty > agenStock.akhir) { showToast('Stok AGEN tidak cukup!', 'error'); return; }
+
+    logOut = {
+      id: idOut, tanggal: tgl, ticket, kode: agenKode, item: agenStock.item, 
+      status: 'AGEN', in: '-', out: qty, gerai: 'INTERNAL', ket: 'Trf out ke HO | ' + ket, user: actor
+    };
+    logIn = {
+      id: idIn, tanggal: tgl, ticket, kode: hoKode, item: hoStock.item, 
+      status: 'HO', in: qty, out: '-', gerai: 'INTERNAL', ket: 'Trf in dari AGEN | ' + ket, user: actor
+    };
+  }
+
+  data.logs.push(logOut, logIn);
+
+  recalculateStok();
+  saveData();
+  addAudit('TRANSFER_STOK', `Transfer stok ${arah} sebanyak ${qty} (Tiket: ${ticket})`);
+  
+  const rowsToSync = [
+    [logOut.id, logOut.tanggal, logOut.ticket, logOut.kode, logOut.item, logOut.status, logOut.in, logOut.out, logOut.gerai, logOut.ket, logOut.user],
+    [logIn.id, logIn.tanggal, logIn.ticket, logIn.kode, logIn.item, logIn.status, logIn.in, logIn.out, logIn.gerai, logIn.ket, logIn.user]
+  ];
+  
+  showToast('⏳ Menyimpan Transfer di Cloud...', 'info');
+  const res = await syncBulkToGAS('Log_Transaksi', rowsToSync);
+  
+  refreshAll();
+  
+  document.getElementById('trfQty').value = '';
+  document.getElementById('trfKet').value = '';
+  document.getElementById('trfHoItem').value = '';
+  document.getElementById('trfAgenItem').value = '';
+
+  if (res && res.isOffline) {
+    showToast('⚠️ Offline: Transfer disimpan lokal & masuk antrean sinkronisasi!', 'warn');
+  } else if (res && res.success) {
+    showToast('✅ Transfer berhasil diproses & disinkronkan!', 'success');
+  } else {
+    showToast('❌ Gagal memproses transfer!', 'error');
+  }
+}
+
+async function processOpname() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const tgl = document.getElementById('opnTgl').value;
+  const kode = extractKode(document.getElementById('opnItem').value);
+  const fisik = parseInt(document.getElementById('opnFisik').value) || 0;
+  const ket = document.getElementById('opnKet').value.trim() || 'Stok Opname';
+
+  if (!kode) { showToast('Pilih barang terlebih dahulu!', 'error'); return; }
+  if (fisik < 0) { showToast('Stok fisik tidak valid!', 'error'); return; }
+  const master = data.master.find(m => m.kode === kode);
+  if (!master) { showToast('Item tidak ditemukan!', 'error'); return; }
+
+  const stat = getNormalizedStatus(master.status);
+  const key = stat === 'HO' ? 'ho' : stat === 'AGEN' ? 'agen' : 'return';
+  const stock = data[key].find(i => i.kode === kode);
+  const selisih = fisik - stock.akhir;
+  if (selisih === 0) { showToast('Stok sama persis, tidak ada selisih.', 'info'); return; }
+
+  const id = genId();
+  stock.akhir = fisik;
+  const inVal = selisih > 0 ? selisih : '-';
+  const outVal = selisih < 0 ? Math.abs(selisih) : '-';
+  const actor = currentUser ? currentUser.username : 'System';
+
+  data.logs.push({
+    id, tanggal: tgl, ticket: 'OPN-' + Date.now().toString().slice(-6),
+    kode, item: master.item, status: stat,
+    in: inVal, out: outVal, gerai: 'OPNAME', ket: 'Fisik(' + fisik + ') | ' + ket, user: actor
+  });
+
+  recalculateStok();
+  saveData();
+  addAudit('OPNAME', `Stok Opname ${kode} fisik: ${fisik} (Selisih: ${selisih})`);
+  
+  showToast('⏳ Menyimpan Opname di Cloud...', 'info');
+  const res = await syncToGAS('Log_Transaksi', [id, tgl, 'OPN-' + Date.now().toString().slice(-6), kode, master.item, stat, inVal, outVal, 'OPNAME', ket, actor], 'append');
+  
+  refreshAll();
+  document.getElementById('opnFisik').value = '';
+  document.getElementById('opnItem').value = '';
+  
+  if (res && res.isOffline) {
+    showToast('⚠️ Offline: Opname disimpan lokal & masuk antrean sinkronisasi!', 'warn');
+  } else if (res && res.success) {
+    showToast('✅ Opname berhasil disinkronkan!', 'success');
+  } else {
+    showToast('❌ Gagal memproses opname!', 'error');
+  }
+}
+
+function formatYMD(dStr) {
+  if (!dStr) return '1970-01-01';
+  if (typeof dStr === 'number' || !isNaN(dStr)) {
+    const utc_days = Math.floor(Number(dStr) - 25569);
+    const utc_value = utc_days * 86400;
+    const date_info = new Date(utc_value * 1000);
+    const year = date_info.getUTCFullYear();
+    const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date_info.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  let s = String(dStr).trim();
+  if (s.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return s;
+  }
+  let parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return s.substring(0, 10);
+}
+
+let stokHarianRows = [];
+let stokHarianCurrentPage = 1;
+const stokHarianRowsPerPage = 25;
+
+function renderStokHarian(recalculate = true) {
+  const start = document.getElementById('filterStart').value;
+  const end = document.getElementById('filterEnd').value;
+  const gudang = document.getElementById('filterGudang').value;
+
+  if (recalculate) {
+    stokHarianCurrentPage = 1;
+    let items = data.master;
+    if (gudang !== 'ALL') items = items.filter(m => getNormalizedStatus(m.status) === gudang);
+
+    let dates = [];
+    let curr = new Date(start + 'T00:00:00'); 
+    let endDt = new Date(end + 'T00:00:00');
+    while (curr <= endDt) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      const d = String(curr.getDate()).padStart(2, '0');
+      dates.push(`${y}-${m}-${d}`);
+      curr.setDate(curr.getDate() + 1);
+    }
+    if (dates.length === 0) dates = [end];
+
+    stokHarianRows = [];
+    dates.forEach(dt => {
+      items.forEach(m => {
+        let baseAwal = num(m.awal);
+        let mStatus = getNormalizedStatus(m.status);
+        
+        let kumulatifInSebelum = 0;
+        let kumulatifOutSebelum = 0;
+        let mutasiInHariIni = 0;
+        let mutasiOutHariIni = 0;
+
+        data.logs.forEach(l => {
+          let lStatus = getNormalizedStatus(l.status);
+          if (l.kode === m.kode && lStatus === mStatus) {
+            let logDate = formatYMD(l.tanggal);
+            const inQ = num(l.in);
+            const outQ = num(l.out);
+            
+            if (logDate < dt) {
+              kumulatifInSebelum += inQ;
+              kumulatifOutSebelum += outQ;
+            } else if (logDate === dt) {
+              mutasiInHariIni += inQ;
+              mutasiOutHariIni += outQ;
+            }
+          }
+        });
+
+        if (mutasiInHariIni === 0 && mutasiOutHariIni === 0) {
+          return;
+        }
+
+        let saldoAwalHari = baseAwal + kumulatifInSebelum - kumulatifOutSebelum;
+        let saldoAkhirHari = saldoAwalHari + mutasiInHariIni - mutasiOutHariIni;
+        
+        stokHarianRows.push({
+          tanggal: dt, kode: m.kode, item: m.item, status: m.status, satuan: m.satuan,
+          awal_hari: saldoAwalHari,
+          masuk: mutasiInHariIni, 
+          keluar: mutasiOutHariIni,
+          akhir_hari: saldoAkhirHari
+        });
+      });
+    });
+  }
+
+  activeTab = 'stok_harian';
+  const totalRows = stokHarianRows.length;
+  const totalPages = Math.ceil(totalRows / stokHarianRowsPerPage) || 1;
+  
+  if (stokHarianCurrentPage > totalPages) stokHarianCurrentPage = totalPages;
+  if (stokHarianCurrentPage < 1) stokHarianCurrentPage = 1;
+
+  const startIndex = (stokHarianCurrentPage - 1) * stokHarianRowsPerPage;
+  const paginatedRows = stokHarianRows.slice(startIndex, startIndex + stokHarianRowsPerPage);
+
+  document.getElementById('tableContent').innerHTML = `
+    <div style="margin-bottom:10px; color:#f2a93b; font-size:12px;">📊 Laporan Stok Harian Aktif (${totalRows} baris)</div>
+    <div class="table-wrap"><div class="scroll">
+      <table style="table-layout: auto;">
+        <colgroup>
+          <col style="width: 120px;">
+          <col style="width: 130px;">
+          <col style="min-width: 220px;">
+          <col style="width: 80px;">
+          <col style="width: 70px;">
+          <col style="width: 80px;">
+          <col style="width: 80px;">
+          <col style="width: 80px;">
+          <col style="width: 80px;">
+        </colgroup>
+        <thead><tr>
+          <th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Status</th><th>Satuan</th>
+          <th class="text-right">Awal</th><th class="text-right">Masuk</th><th class="text-right">Keluar</th><th class="text-right">Akhir</th>
+        </tr></thead>
+        <tbody>
+          ` + (paginatedRows.length === 0 ? '<tr><td colspan="9" class="text-muted text-center" style="padding:15px;">Tidak ada data mutasi pada periode ini</td></tr>' : paginatedRows.map(r => `
+            <tr>
+              <td>` + formatDateSimple(r.tanggal) + `</td>
+              <td class="text-muted" style="font-family:monospace;">` + r.kode + `</td>
+              <td>` + r.item + `</td>
+              <td><span class="badge ok">` + r.status + `</span></td>
+              <td>` + r.satuan + `</td>
+              <td class="text-right">` + fmt(r.awal_hari) + `</td>
+              <td class="text-right" style="color:#3fb950;">` + (r.masuk > 0 ? '+' + fmt(r.masuk) : '—') + `</td>
+              <td class="text-right" style="color:#f85149;">` + (r.keluar > 0 ? '-' + fmt(r.keluar) : '—') + `</td>
+              <td class="text-right" style="font-weight:700;">` + fmt(r.akhir_hari) + `</td>
+            </tr>
+          `).join('')) + `
+        </tbody>
+      </table>
+    </div></div>
+    <div class="pagination-bar">
+      <span>Menampilkan ` + (totalRows === 0 ? 0 : startIndex + 1) + ` - ` + Math.min(startIndex + stokHarianRowsPerPage, totalRows) + ` dari total ` + totalRows + ` data</span>
+      <div class="flex" style="gap:4px;">
+        <button class="btn" style="padding:3px 8px;" onclick="changeStokHarianPage(-1)" ` + (stokHarianCurrentPage === 1 ? 'disabled style="opacity:0.4; cursor:default;"' : '') + `>◀ Prev</button>
+        <span style="padding:3px 6px; color:#f2a93b; font-weight:600;">Hal ` + stokHarianCurrentPage + ` / ` + (totalPages || 1) + `</span>
+        <button class="btn" style="padding:3px 8px;" onclick="changeStokHarianPage(1)" ` + (stokHarianCurrentPage >= totalPages ? 'disabled style="opacity:0.4; cursor:default;"' : '') + `>Next ▶</button>
+      </div>
+    </div>
+  `;
+}
+
+function changeStokHarianPage(direction) {
+  stokHarianCurrentPage += direction;
+  renderStokHarian(false);
+  const scrollContainer = document.querySelector('.scroll');
+  if (scrollContainer) scrollContainer.scrollTop = 0;
+}
+
+function exportStokHarian() {
+  const start = document.getElementById('filterStart').value;
+  const end = document.getElementById('filterEnd').value;
+  const gudang = document.getElementById('filterGudang').value;
+
+  if (!start || !end) { showToast('Pilih rentang tanggal mulai dan sampai!', 'error'); return; }
+  if (new Date(start) > new Date(end)) { showToast('Tanggal mulai tidak valid!', 'error'); return; }
+
+  let items = data.master;
+  if (gudang !== 'ALL') items = items.filter(m => getNormalizedStatus(m.status) === gudang);
+
+  let dateList = [];
+  let curr = new Date(start + 'T00:00:00');
+  let endDt = new Date(end + 'T00:00:00');
+  while (curr <= endDt) {
+    const y = curr.getFullYear();
+    const m = String(curr.getMonth() + 1).padStart(2, '0');
+    const d = String(curr.getDate()).padStart(2, '0');
+    dateList.push(`${y}-${m}-${d}`);
+    curr.setDate(curr.getDate() + 1);
+  }
+
+  let rows = [];
+  items.forEach((m, idx) => {
+    let rowObj = { "NO": idx + 1, "MATERIAL": m.kode, "ITEM": m.item, "SATUAN": m.satuan, "BUFFER": m.buffer || 0, "STATUS": m.status };
+    let mStatus = getNormalizedStatus(m.status);
+    let itemLogs = data.logs.filter(l => l.kode === m.kode && getNormalizedStatus(l.status) === mStatus);
+
+    dateList.forEach(dt => {
+      let base = num(m.awal);
+      let totalIn = 0, totalOut = 0;
+      itemLogs.forEach(l => {
+        let logDate = formatYMD(l.tanggal);
+        if (logDate <= dt) { 
+          totalIn += num(l.in); 
+          totalOut += num(l.out); 
+        }
+      });
+      rowObj[dt] = base + totalIn - totalOut; 
+    });
+    rows.push(rowObj);
+  });
+
+  if (rows.length === 0) { showToast('Tidak ada data!', 'error'); return; }
+  
+  if (typeof XLSX === 'undefined') {
+    showToast('❌ Fitur ekspor Excel tidak aktif karena CDN SheetJS (XLSX) tidak dapat dimuat!', 'error');
+    return;
+  }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Report_Stok_Pivot');
+  XLSX.writeFile(wb, `Laporan_Stok_Pivot_${start}_sd_${end}.xlsx`);
+  showToast('✅ Laporan Excel Pivot didownload!', 'success');
+}
+
+async function syncReportToGAS() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  showToast('💡 Pada Supabase, laporan dihitung langsung secara real-time dari database. Tidak perlu lagi menulis file report fisik ke cloud!', 'info');
+}
+
+document.getElementById('fileUpload')?.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  document.getElementById('fileName').textContent = file ? file.name : 'Belum ada file';
+});
+
+async function processBulk() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  if (typeof XLSX === 'undefined') {
+    showToast('❌ Fitur Bulk Upload tidak aktif karena CDN SheetJS (XLSX) tidak dapat dimuat!', 'error');
+    return;
+  }
+  const fileInput = document.getElementById('fileUpload');
+  if (!fileInput.files.length) { showToast('Pilih file Excel dulu!', 'error'); return; }
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const dataFile = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(dataFile, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+      if (json.length < 2) { showToast('File kosong!', 'error'); return; }
+
+      let rowsToSync = [];
+      let count = 0;
+      const actor = currentUser ? currentUser.username : 'System';
+
+      let warningItems = [];
+      let simulatedStockMap = {}; // keep track of stock levels during calculation
+
+      for (let i = 1; i < json.length; i++) {
+        const r = json[i];
+        if (!r || r.length < 5) continue;
+        const tgl = excelDateToISO(r[0]);
+        const ticket = r[1] ? String(r[1]).trim() : 'BULK-' + Date.now().toString().slice(-6);
+        const kode = String(r[2] || '').trim();
+        const jenis = String(r[3] || 'out').toLowerCase();
+        const qty = Number(r[4]) || 0;
+        const gerai = String(r[5] || 'Gerai Utama');
+        const ket = String(r[6] || 'Upload Massal');
+
+        if (!kode || qty <= 0) continue;
+        const master = data.master.find(m => m.kode === kode);
+        if (!master) continue;
+
+        const stat = getNormalizedStatus(master.status);
+        const key = stat === 'HO' ? 'ho' : stat === 'AGEN' ? 'agen' : 'return';
+        const stock = data[key].find(i => i.kode === kode);
+        if (!stock) continue;
+
+        // Set baseline simulated stock if not set yet
+        if (simulatedStockMap[kode] === undefined) {
+          simulatedStockMap[kode] = stock.akhir;
+        }
+
+        if (jenis === 'out') {
+          if (simulatedStockMap[kode] - qty < 0) {
+            warningItems.push(`${kode} (${master.item}): Stok ${simulatedStockMap[kode]}, Mutasi OUT: ${qty}`);
+          }
+          simulatedStockMap[kode] -= qty;
+        } else {
+          simulatedStockMap[kode] += qty;
+        }
+
+        const id = genId();
+        const inVal = jenis === 'in' ? qty : '-';
+        const outVal = jenis === 'out' ? qty : '-';
+
+        data.logs.push({
+          id, tanggal: tgl, ticket, kode,
+          item: master.item, status: stat,
+          in: inVal, out: outVal, gerai, ket, user: actor
+        });
+        rowsToSync.push([id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, ket, actor]);
+        count++;
+      }
+
+      if (warningItems.length > 0) {
+        const proceed = confirm(`⚠️ PERINGATAN: Upload ini akan mengakibatkan stok negatif pada item berikut:\n\n` + warningItems.join('\n') + `\n\nApakah Anda yakin ingin memproses data ini?`);
+        if (!proceed) {
+          // Revert newly added logs!
+          data.logs.splice(data.logs.length - count, count);
+          recalculateStok();
+          saveData();
+          fileInput.value = '';
+          document.getElementById('fileName').textContent = 'Belum ada file';
+          return;
+        }
+      }
+
+      recalculateStok();
+      saveData();
+      addAudit('BULK_UPLOAD', `Upload massal ${count} transaksi via Excel`);
+      if (rowsToSync.length > 0) {
+        showToast('⏳ Menyinkronkan data massal ke GAS...', 'info');
+        const res = await syncBulkToGAS('Log_Transaksi', rowsToSync);
+        if (!res.success) {
+          showToast('⚠️ Gagal sinkron massal ke GAS: ' + (res.message || ''), 'error');
+        }
+      }
+      refreshAll();
+      fileInput.value = '';
+      document.getElementById('fileName').textContent = 'Belum ada file';
+      showToast('✅ ' + count + ' transaksi berhasil diimport!', 'success');
+    } catch(err) {
+      showToast('❌ Gagal: ' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(fileInput.files[0]);
+}
+
+function refreshAll() {
+  renderKPIs();
+  renderTabs();
+  renderChartsContainer();
+  if (activeDash === 'grafik') {
+    renderGlobalGrafikDashboard();
+  }
+  renderContent();
+  populateDropdowns();
+  showPanel(activeDash);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  initData();
+  recalculateStok();
+  setStatus('online', 'ONLINE');
+
+  document.querySelectorAll('.dash-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const dash = this.dataset.dash;
+      if (!isLoggedIn() && ['transfer','upload','opname','master','input','users','gerai','audit'].includes(dash)) {
+        showToast('Silakan login terlebih dahulu!', 'error');
+        showLogin();
+        return;
+      }
+
+      document.querySelectorAll('.dash-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      activeDash = dash;
+      currentPage = 1;
+
+      renderTabs();
+      renderChartsContainer();
+
+      if (dash === 'grafik') {
+        activeTab = 'grafik';
+        showPanel(dash);
+        renderGlobalGrafikDashboard();
+        renderContent();
+        return;
+      }
+
+      if (dash === 'gerai') {
+        activeTab = 'gerai';
+        showPanel(dash);
+        const container = document.getElementById('tableContent');
+        container.innerHTML = `
+          <div style="margin-bottom:10px; color:#f2a93b; font-size:12px;">🏪 Daftar Gerai Terdaftar (${(data.gerai || []).length} gerai)</div>
+          <div class="table-wrap"><div class="scroll"><table>
+            <thead><tr><th>No</th><th>Nama Gerai / Cabang</th><th>Aksi</th></tr></thead>
+            <tbody>
+              ${(data.gerai || []).map((g, idx) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td style="font-weight:600; color:#58a6ff;">${g}</td>
+                  <td>${isAdmin() ? `<button class="btn btn-danger" style="padding:2px 8px; font-size:10px;" onclick="deleteGerai('${g}')">🗑️ Hapus</button>` : '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table></div></div>
+        `;
+        return;
+      }
+
+      if (dash === 'audit') {
+        activeTab = 'audit_list';
+        showPanel(dash);
+        renderContent();
+        return;
+      }
+
+      if (dash === 'stok_harian') {
+        activeTab = 'stok_harian';
+        showPanel(dash);
+        renderStokHarian();
+        return;
+      }
+
+      showPanel(dash);
+      if (dash === 'users') { renderUserTable(); return; }
+
+      if (dash === 'ho') activeTab = 'ho';
+      else if (dash === 'agen') activeTab = 'agen';
+      else if (dash === 'return') activeTab = 'return';
+      else if (dash === 'master') activeTab = 'master_all';
+      else activeTab = 'ho';
+
+      refreshAll();
+    });
+  });
+
+  document.getElementById('localTableSearch')?.addEventListener('input', function() {
+    currentPage = 1;
+    renderContent();
+  });
+
+  document.getElementById('globalSearch')?.addEventListener('input', function() {
+    currentPage = 1;
+    renderContent();
+  });
+
+  updateUI();
+  updateOfflineStatusUI();
+  
+  setTimeout(() => {
+    testGASConnection().then(() => pullData());
+  }, 1000);
+});
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2737bc35dd162b7',t:'MTc4NjA3NjM3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
