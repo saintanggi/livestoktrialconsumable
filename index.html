@@ -1563,10 +1563,12 @@ async function pullData() {
       .order('kode', { ascending: true });
     if (masterErr) throw masterErr;
 
-    // 2. Tarik Data Log Transaksi dari Supabase
+    // 2. Tarik Data Log Transaksi dari Supabase (Ditambahkan limit tinggi & pengurutan terbaru agar data tidak hilang/terpotong!)
     const { data: dbLogs, error: logsErr } = await supabaseClient
       .from('log_transaksi')
-      .select('*');
+      .select('*')
+      .order('tanggal', { ascending: false }) // Ambil transaksi terbaru terlebih dahulu
+      .limit(20000); // Naikkan limit saas default dari 1000 menjadi 20.000 baris!
     if (logsErr) throw logsErr;
 
     // 3. Tarik Data Gerai dari Supabase
@@ -4275,5 +4277,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2770bfffb7cfe14',t:'MTc4NjExMzczNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
