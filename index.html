@@ -176,6 +176,7 @@
       <button class="dash-btn active" data-dash="ho">🏢 HO</button>
       <button class="dash-btn" data-dash="agen">🏪 AGEN</button>
       <button class="dash-btn" data-dash="return">📦 RETURN</button>
+      <button class="dash-btn auth-btn" data-dash="po" style="display:none; color:#58a6ff; border-color:#58a6ff55;">📄 PO & Penerimaan</button>
       <button class="dash-btn" data-dash="stok_harian">📅 Stok Harian</button>
       <button class="dash-btn" data-dash="grafik" style="background:#58a6ff1a; color:#58a6ff; border-color:#58a6ff44;">📈 Grafik Global</button>
       <button class="dash-btn auth-btn" data-dash="transfer" style="display:none;">🔄 Transfer</button>
@@ -250,6 +251,114 @@
             <canvas id="grafikGlobalTopProducts"></canvas>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- PANEL PO & PENERIMAAN VENDOR -->
+    <div class="panel hidden" id="panelPO">
+      <h3>📄 Purchase Order (PO) & Penerimaan Barang Parsial Vendor</h3>
+      <p>Kelola pesanan pembelian barang ke vendor, lacak pengiriman sebagian (parsial), sisa kiriman, dan bukti surat jalan secara otomatis.</p>
+      
+      <div class="tab-bar" style="margin-top: 14px; margin-bottom: 14px;">
+        <button class="tab-btn active" id="tabPoList" onclick="switchPoTab('list')">📋 Daftar PO Outstanding</button>
+        <button class="tab-btn" id="tabPoCreate" onclick="switchPoTab('create')">➕ Buat PO Baru</button>
+        <button class="tab-btn" id="tabPoDelivery" onclick="switchPoTab('delivery')">🚚 Terima Barang Parsial</button>
+        <button class="tab-btn" id="tabPoHistory" onclick="switchPoTab('history')">📝 Riwayat Penerimaan SJ</button>
+      </div>
+
+      <!-- TAB 1: DAFTAR PO OUTSTANDING -->
+      <div class="po-sub-tab" id="poTabList">
+        <div style="margin-bottom:10px; color:#f2a93b; font-size:12px;">Daftar PO yang belum selesai dikirim oleh Vendor</div>
+        <div class="table-wrap"><div class="scroll">
+          <table style="table-layout: auto;">
+            <thead>
+              <tr>
+                <th>TGL ORDER</th>
+                <th>NO PO</th>
+                <th>VENDOR</th>
+                <th>KODE</th>
+                <th>NAMA BARANG</th>
+                <th>GUDANG</th>
+                <th class="text-right">QTY ORDER</th>
+                <th class="text-right">QTY MASUK</th>
+                <th class="text-right">SISA KIRIMAN</th>
+                <th>DUE DATE</th>
+              </tr>
+            </thead>
+            <tbody id="poListTableBody">
+              <tr><td colspan="10" class="text-muted text-center" style="padding:15px;">Loading PO data...</td></tr>
+            </tbody>
+          </table>
+        </div></div>
+      </div>
+
+      <!-- TAB 2: BUAT PO BARU -->
+      <div class="po-sub-tab hidden" id="poTabCreate">
+        <div class="form-grid">
+          <div class="form-group"><label>Tanggal Order</label><input type="date" id="poTglOrder"></div>
+          <div class="form-group"><label>No PO</label><input type="text" id="poNoPo" placeholder="Contoh: 3100012249"></div>
+          <div class="form-group"><label>Nama Vendor</label><input type="text" id="poVendor" placeholder="Contoh: PT PIALA KEMAS AGUNG"></div>
+          <div class="form-group"><label>Pilih Barang</label><input type="text" id="poItem" list="dlAllItems" placeholder="🔍 Cari barang..."></div>
+          <div class="form-group"><label>Tujuan Gudang</label>
+            <select id="poGudang">
+              <option value="HO">HO</option>
+              <option value="AGEN">AGEN</option>
+            </select>
+          </div>
+          <div class="form-group"><label>QTY Order</label><input type="number" id="poQtyOrder" min="1" placeholder="0"></div>
+          <div class="form-group"><label>Due Date (Batas Kirim)</label><input type="date" id="poDueDate"></div>
+          <div class="form-group" style="justify-content: flex-end;"><button class="btn btn-primary" onclick="submitNewPo()">Simpan PO Baru</button></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: TERIMA BARANG PARSIAL -->
+      <div class="po-sub-tab hidden" id="poTabDelivery">
+        <div class="form-grid">
+          <div class="form-group" style="grid-column: span 2;"><label>Pilih PO Vendor (Outstanding)</label>
+            <select id="poDeliverySelectPo" onchange="onPoSelectChange()"></select>
+          </div>
+          <div class="form-group"><label>Tanggal Penerimaan</label><input type="date" id="poDeliveryTgl"></div>
+          <div class="form-group"><label>No Surat Jalan (SJ)</label><input type="text" id="poDeliveryNoSj" placeholder="Contoh: SJ-99882"></div>
+          <div class="form-group"><label>QTY Masuk (Parsial)</label><input type="number" id="poDeliveryQty" min="1" placeholder="0"></div>
+          <div class="form-group" style="grid-column: span 2;"><label>Keterangan Penerimaan</label><input type="text" id="poDeliveryKet" placeholder="Keterangan tambahan (misal: Sisa kiriman menyusul)"></div>
+          <div class="form-group" style="justify-content: flex-end;"><button class="btn btn-primary" onclick="submitPoDelivery()">Proses Penerimaan</button></div>
+        </div>
+        
+        <!-- PO Info Box -->
+        <div class="status-box" id="poInfoBox" style="margin-top: 15px; display: none; background: #21262d; border-color: #30363d; padding: 12px; flex-direction: column; gap: 4px; align-items: flex-start; border-radius: 6px;">
+          <h4 style="font-size: 12px; color: #f2a93b; font-weight: bold; margin-bottom: 4px;">📋 Informasi Outstanding PO Seleksi:</h4>
+          <span style="font-size:11px; color:#c9d1d9;" id="poInfoVendor">Vendor: -</span>
+          <span style="font-size:11px; color:#c9d1d9;" id="poInfoBarang">Barang: -</span>
+          <span style="font-size:11px; color:#c9d1d9;" id="poInfoQtyOrder">Total QTY Order: 0</span>
+          <span style="font-size:11px; color:#c9d1d9;" id="poInfoQtyMasuk">QTY Sudah Masuk: 0</span>
+          <span style="font-size:12px; font-weight: bold; color: #3fb950;" id="poInfoSisa">Sisa Kiriman yang Belum Datang: 0</span>
+        </div>
+      </div>
+
+      <!-- TAB 4: RIWAYAT PENERIMAAN SJ -->
+      <div class="po-sub-tab hidden" id="poTabHistory">
+        <div style="margin-bottom:10px; color:#f2a93b; font-size:12px;">Riwayat lengkap kedatangan barang parsial berdasarkan Surat Jalan</div>
+        <div class="table-wrap"><div class="scroll">
+          <table style="table-layout: auto;">
+            <thead>
+              <tr>
+                <th>TANGGAL MASUK</th>
+                <th>NO PO</th>
+                <th>NO SURAT JALAN</th>
+                <th>KODE BARANG</th>
+                <th>NAMA BARANG</th>
+                <th>GUDANG</th>
+                <th class="text-right">QTY MASUK</th>
+                <th>PENERIMA</th>
+                <th>KETERANGAN</th>
+                <th>AKSI</th>
+              </tr>
+            </thead>
+            <tbody id="poHistoryTableBody">
+              <tr><td colspan="10" class="text-muted text-center" style="padding:15px;">Belum ada riwayat penerimaan</td></tr>
+            </tbody>
+          </table>
+        </div></div>
       </div>
     </div>
 
@@ -871,7 +980,9 @@ let data = {
   master: [],
   logs: [],
   gerai: ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'],
-  audit: []
+  audit: [],
+  po: [],
+  po_deliveries: []
 };
 
 let activeDash = 'ho';
@@ -1109,6 +1220,10 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
   let table = 'log_transaksi';
   if (sheet.startsWith('Master_')) {
     table = 'master_barang';
+  } else if (sheet === 'purchase_orders') {
+    table = 'purchase_orders';
+  } else if (sheet === 'po_deliveries') {
+    table = 'po_deliveries';
   }
 
   try {
@@ -1140,6 +1255,40 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
         error = err;
       } else if (action === 'delete') {
         const { error: err } = await supabaseClient.from('master_barang').delete().eq('kode', id);
+        error = err;
+      }
+    } else if (table === 'purchase_orders') {
+      if (action === 'append') {
+        const { error: err } = await supabaseClient.from('purchase_orders').insert({
+          id: row[0],
+          tgl_order: row[1],
+          nama_barang: row[2],
+          kode_barang: row[3],
+          due_date: row[4],
+          nama_vendor: row[5],
+          no_po: row[6],
+          gudang: row[7],
+          qty_order: parseInt(row[8]) || 0
+        });
+        error = err;
+      } else if (action === 'delete') {
+        const { error: err } = await supabaseClient.from('purchase_orders').delete().eq('id', id);
+        error = err;
+      }
+    } else if (table === 'po_deliveries') {
+      if (action === 'append') {
+        const { error: err } = await supabaseClient.from('po_deliveries').insert({
+          id: row[0],
+          no_po: row[1],
+          tgl_masuk: row[2],
+          no_sj: row[3],
+          qty_masuk: parseInt(row[4]) || 0,
+          keterangan: row[5],
+          user_penerima: row[6]
+        });
+        error = err;
+      } else if (action === 'delete') {
+        const { error: err } = await supabaseClient.from('po_deliveries').delete().eq('id', id);
         error = err;
       }
     } else if (table === 'log_transaksi') {
@@ -1284,6 +1433,44 @@ async function pullData() {
       .from('gerai')
       .select('nama');
     if (geraiErr) throw geraiErr;
+
+    // 4. Tarik Data Purchase Orders dari Supabase
+    const { data: dbPo, error: poErr } = await supabaseClient
+      .from('purchase_orders')
+      .select('*');
+    if (poErr) {
+      console.warn('Tabel purchase_orders belum dibuat di Supabase, mengabaikan.');
+    } else {
+      data.po = (dbPo || []).map(p => ({
+        id: p.id,
+        tgl_order: p.tgl_order,
+        no_po: p.no_po,
+        nama_vendor: p.nama_vendor,
+        kode_barang: p.kode_barang,
+        nama_barang: p.nama_barang,
+        gudang: p.gudang,
+        qty_order: parseInt(p.qty_order) || 0,
+        due_date: p.due_date
+      }));
+    }
+
+    // 5. Tarik Data PO Deliveries dari Supabase
+    const { data: dbDeliveries, error: delErr } = await supabaseClient
+      .from('po_deliveries')
+      .select('*');
+    if (delErr) {
+      console.warn('Tabel po_deliveries belum dibuat di Supabase, mengabaikan.');
+    } else {
+      data.po_deliveries = (dbDeliveries || []).map(d => ({
+        id: d.id,
+        no_po: d.no_po,
+        tgl_masuk: d.tgl_masuk,
+        no_sj: d.no_sj,
+        qty_masuk: parseInt(d.qty_masuk) || 0,
+        keterangan: d.keterangan || '-',
+        user_penerima: d.user_penerima || 'System'
+      }));
+    }
 
     // Map Master Barang
     data.master = (dbMaster || []).map(m => ({
@@ -1591,6 +1778,7 @@ function showPanel(dash) {
     grafik: 'panelGrafik',
     gerai: 'panelGerai',
     audit: 'panelAudit',
+    po: 'panelPO',
     stok_harian: 'panelStokHarian',
     transfer: 'panelTransfer',
     upload: 'panelUpload',
@@ -3267,6 +3455,344 @@ async function processBulk() {
   reader.readAsArrayBuffer(fileInput.files[0]);
 }
 
+let activePoTab = 'list';
+
+function switchPoTab(tab) {
+  activePoTab = tab;
+  document.querySelectorAll('#panelPO .tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.po-sub-tab').forEach(p => p.classList.add('hidden'));
+
+  if (tab === 'list') {
+    document.getElementById('tabPoList').classList.add('active');
+    document.getElementById('poTabList').classList.remove('hidden');
+    renderPoList();
+  } else if (tab === 'create') {
+    document.getElementById('tabPoCreate').classList.add('active');
+    document.getElementById('poTabCreate').classList.remove('hidden');
+    // Set default dates
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('poTglOrder').value = today;
+    document.getElementById('poDueDate').value = today;
+  } else if (tab === 'delivery') {
+    document.getElementById('tabPoDelivery').classList.add('active');
+    document.getElementById('poTabDelivery').classList.remove('hidden');
+    document.getElementById('poDeliveryTgl').value = new Date().toISOString().split('T')[0];
+    populatePoDropdowns();
+  } else if (tab === 'history') {
+    document.getElementById('tabPoHistory').classList.add('active');
+    document.getElementById('poTabHistory').classList.remove('hidden');
+    renderPoHistory();
+  }
+}
+
+function calculatePoTotals() {
+  // Hitung total QTY Masuk untuk setiap PO berdasarkan po_deliveries
+  const poTotals = {};
+  (data.po_deliveries || []).forEach(d => {
+    poTotals[d.no_po] = (poTotals[d.no_po] || 0) + parseInt(d.qty_masuk || 0);
+  });
+  return poTotals;
+}
+
+function renderPoList() {
+  const tbody = document.getElementById('poListTableBody');
+  if (!tbody) return;
+
+  const poTotals = calculatePoTotals();
+  const poItems = data.po || [];
+
+  if (poItems.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="text-muted text-center" style="padding:15px;">Belum ada Purchase Order (PO). Buat PO baru di tab sebelah!</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = poItems.map(p => {
+    const qtyMasuk = poTotals[p.no_po] || 0;
+    const sisa = Math.max(0, p.qty_order - qtyMasuk);
+    return `
+      <tr>
+        <td>${formatDateSimple(p.tgl_order)}</td>
+        <td class="text-muted" style="font-family:monospace; font-weight:700;">${p.no_po}</td>
+        <td style="font-weight:600; color:#58a6ff;">${p.nama_vendor}</td>
+        <td class="text-muted" style="font-family:monospace;">${p.kode_barang}</td>
+        <td>${p.nama_barang}</td>
+        <td><span class="badge ${p.gudang === 'HO' ? 'ok' : 'warn'}">${p.gudang}</span></td>
+        <td class="text-right" style="font-weight:600;">${fmt(p.qty_order)}</td>
+        <td class="text-right" style="color:#3fb950; font-weight:600;">${qtyMasuk > 0 ? '+' + fmt(qtyMasuk) : '—'}</td>
+        <td class="text-right" style="color:${sisa > 0 ? '#f2a93b' : '#3fb950'}; font-weight:700;">${sisa > 0 ? fmt(sisa) : 'Selesai ✓'}</td>
+        <td>${formatDateSimple(p.due_date)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderPoHistory() {
+  const tbody = document.getElementById('poHistoryTableBody');
+  if (!tbody) return;
+
+  const deliveries = data.po_deliveries || [];
+
+  if (deliveries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="text-muted text-center" style="padding:15px;">Belum ada riwayat surat jalan masuk. Lakukan penerimaan barang di tab sebelah!</td></tr>';
+    return;
+  }
+
+  // Ambil informasi master barang & gudang untuk melengkapi riwayat
+  tbody.innerHTML = deliveries.sort((a,b) => new Date(b.tgl_masuk) - new Date(a.tgl_masuk)).map(d => {
+    const po = data.po.find(p => p.no_po === d.no_po) || {};
+    return `
+      <tr>
+        <td>${formatDateSimple(d.tgl_masuk)}</td>
+        <td class="text-muted" style="font-family:monospace;">${d.no_po}</td>
+        <td class="text-muted" style="font-family:monospace; font-weight:700; color:#58a6ff;">${d.no_sj}</td>
+        <td class="text-muted" style="font-family:monospace;">${po.kode_barang || '—'}</td>
+        <td>${po.nama_barang || '—'}</td>
+        <td><span class="badge ${po.gudang === 'HO' ? 'ok' : 'warn'}">${po.gudang || '—'}</span></td>
+        <td class="text-right text-success" style="font-weight:700;">+${fmt(d.qty_masuk)}</td>
+        <td><span class="badge warn" style="font-size:9px;">${d.user_penerima || 'System'}</span></td>
+        <td class="text-muted">${d.keterangan || '-'}</td>
+        <td>
+          <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deletePoDelivery('${d.id}')">🗑️ Hapus</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function populatePoDropdowns() {
+  const select = document.getElementById('poDeliverySelectPo');
+  if (!select) return;
+
+  const poTotals = calculatePoTotals();
+  const outstandingPos = (data.po || []).filter(p => {
+    const qtyMasuk = poTotals[p.no_po] || 0;
+    return p.qty_order - qtyMasuk > 0;
+  });
+
+  if (outstandingPos.length === 0) {
+    select.innerHTML = '<option value="">-- Tidak ada PO Outstanding --</option>';
+    document.getElementById('poInfoBox').style.display = 'none';
+    return;
+  }
+
+  select.innerHTML = '<option value="">-- Pilih No PO Vendor --</option>' + outstandingPos.map(p => `
+    <option value="${p.no_po}">[${p.no_po}] ${p.nama_vendor} — ${p.nama_barang} (${p.gudang})</option>
+  `).join('');
+  onPoSelectChange();
+}
+
+function onPoSelectChange() {
+  const select = document.getElementById('poDeliverySelectPo');
+  const box = document.getElementById('poInfoBox');
+  if (!select || !box) return;
+
+  const noPo = select.value;
+  if (!noPo) {
+    box.style.display = 'none';
+    return;
+  }
+
+  const p = data.po.find(x => x.no_po === noPo);
+  if (!p) return;
+
+  const poTotals = calculatePoTotals();
+  const qtyMasuk = poTotals[p.no_po] || 0;
+  const sisa = p.qty_order - qtyMasuk;
+
+  document.getElementById('poInfoVendor').textContent = `Vendor: ${p.nama_vendor}`;
+  document.getElementById('poInfoBarang').textContent = `Barang: [${p.kode_barang}] ${p.nama_barang} (${p.gudang})`;
+  document.getElementById('poInfoQtyOrder').textContent = `Total QTY Order: ${fmt(p.qty_order)} ${p.satuan || 'PCS'}`;
+  document.getElementById('poInfoQtyMasuk').textContent = `QTY Sudah Masuk: ${fmt(qtyMasuk)}`;
+  document.getElementById('poInfoSisa').textContent = `Sisa Kiriman yang Belum Datang: ${fmt(sisa)}`;
+  box.style.display = 'flex';
+}
+
+async function submitNewPo() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const tgl = document.getElementById('poTglOrder').value;
+  const noPo = document.getElementById('poNoPo').value.trim();
+  const vendor = document.getElementById('poVendor').value.trim();
+  const itemStr = document.getElementById('poItem').value;
+  const gudang = document.getElementById('poGudang').value;
+  const qty = parseInt(document.getElementById('poQtyOrder').value) || 0;
+  const dueDate = document.getElementById('poDueDate').value;
+
+  if (!noPo || !vendor || !itemStr || qty <= 0) {
+    showToast('Harap isi semua kolom dengan benar!', 'error');
+    return;
+  }
+
+  const kode = extractKode(itemStr);
+  const master = data.master.find(m => m.kode === kode);
+  if (!master) {
+    showToast('Barang tidak ditemukan di database master!', 'error');
+    return;
+  }
+
+  // Validasi agar no PO unik
+  if (data.po.some(p => p.no_po === noPo)) {
+    showToast('No PO ini sudah terdaftar!', 'error');
+    return;
+  }
+
+  const id = 'po_' + Date.now();
+  const newPo = {
+    id,
+    tgl_order: tgl,
+    no_po: noPo,
+    nama_vendor: vendor,
+    kode_barang: kode,
+    nama_barang: master.item,
+    gudang: gudang,
+    qty_order: qty,
+    satuan: master.satuan,
+    due_date: dueDate
+  };
+
+  data.po.push(newPo);
+  saveData();
+  addAudit('CREATE_PO', `Membuat PO baru: ${noPo} (${vendor}) senilai ${qty} ${master.satuan}`);
+
+  showToast('⏳ Menyimpan PO di Cloud...', 'info');
+  // Sinkronkan ke tabel "purchase_orders" di Supabase
+  const res = await syncToGAS('purchase_orders', [id, tgl, master.item, kode, dueDate, vendor, noPo, gudang, qty], 'append');
+
+  // Bersihkan form
+  document.getElementById('poNoPo').value = '';
+  document.getElementById('poVendor').value = '';
+  document.getElementById('poItem').value = '';
+  document.getElementById('poQtyOrder').value = '';
+
+  switchPoTab('list');
+
+  if (res && res.isOffline) {
+    showToast('⚠️ Offline: PO disimpan lokal & masuk antrean sinkronisasi!', 'warn');
+  } else if (res && res.success) {
+    showToast('✅ PO baru berhasil disimpan & disinkronkan!', 'success');
+  } else {
+    showToast('❌ Gagal menyimpan PO ke cloud!', 'error');
+  }
+}
+
+async function submitPoDelivery() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const noPo = document.getElementById('poDeliverySelectPo').value;
+  const tgl = document.getElementById('poDeliveryTgl').value;
+  const noSj = document.getElementById('poDeliveryNoSj').value.trim();
+  const qty = parseInt(document.getElementById('poDeliveryQty').value) || 0;
+  const ket = document.getElementById('poDeliveryKet').value.trim() || '-';
+
+  if (!noPo || !noSj || qty <= 0) {
+    showToast('Harap isi semua kolom dengan benar!', 'error');
+    return;
+  }
+
+  const p = data.po.find(x => x.no_po === noPo);
+  if (!p) return;
+
+  const poTotals = calculatePoTotals();
+  const qtyMasuk = poTotals[p.no_po] || 0;
+  const sisa = p.qty_order - qtyMasuk;
+
+  if (qty > sisa) {
+    const confirmOver = confirm(`⚠️ Perhatian: QTY Masuk (${fmt(qty)}) melampaui sisa kiriman PO (${fmt(sisa)}).\n\nApakah Anda yakin ingin tetap memproses pengiriman lebih ini?`);
+    if (!confirmOver) return;
+  }
+
+  const deliveryId = 'del_' + Date.now();
+  const actor = currentUser ? currentUser.username : 'System';
+
+  const newDelivery = {
+    id: deliveryId,
+    no_po: noPo,
+    tgl_masuk: tgl,
+    no_sj: noSj,
+    qty_masuk: qty,
+    keterangan: ket,
+    user_penerima: actor
+  };
+
+  // 1. Simpan pengiriman parsial
+  data.po_deliveries.push(newDelivery);
+
+  // 2. OTOMATIS Buat log masuk (IN) di transaksi harian utama untuk menambah stok gudang!
+  const trxId = genId();
+  const logObj = {
+    id: trxId,
+    tanggal: tgl,
+    ticket: noSj, // No Surat Jalan dipetakan sebagai tiket log harian
+    kode: p.kode_barang,
+    item: p.nama_barang,
+    status: p.gudang,
+    in: qty,
+    out: '-',
+    gerai: `VENDOR (${p.nama_vendor})`,
+    ket: `Penerimaan Parsial PO: ${p.no_po} | ${ket}`,
+    user: actor
+  };
+  data.logs.push(logObj);
+
+  recalculateStok();
+  saveData();
+  addAudit('PO_DELIVERY', `Terima sebagian PO ${p.no_po} via Surat Jalan ${noSj} sebanyak ${qty}`);
+
+  showToast('⏳ Menyimpan Penerimaan di Cloud...', 'info');
+  // Sinkronkan ke tabel "po_deliveries" di Supabase
+  const res1 = await syncToGAS('po_deliveries', [deliveryId, noPo, tgl, noSj, qty, ket, actor], 'append');
+  // Sinkronkan ke tabel "log_transaksi" di Supabase secara otomatis!
+  const res2 = await syncToGAS('Log_Transaksi', [trxId, tgl, noSj, p.kode_barang, p.nama_barang, p.gudang, qty, '-', `VENDOR (${p.nama_vendor})`, `Penerimaan Parsial PO: ${p.no_po} | ${ket}`, actor], 'append');
+
+  // Bersihkan form
+  document.getElementById('poDeliveryNoSj').value = '';
+  document.getElementById('poDeliveryQty').value = '';
+  document.getElementById('poDeliveryKet').value = '';
+
+  switchPoTab('history');
+
+  if ((res1 && res1.isOffline) || (res2 && res2.isOffline)) {
+    showToast('⚠️ Offline: Penerimaan disimpan lokal & masuk antrean sinkronisasi!', 'warn');
+  } else if (res1 && res1.success && res2 && res2.success) {
+    showToast('✅ Penerimaan barang parsial & log transaksi berhasil disimpan!', 'success');
+  } else {
+    showToast('❌ Gagal sinkronisasi penuh ke cloud!', 'error');
+  }
+}
+
+async function deletePoDelivery(id) {
+  if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
+  if (!confirm('Apakah Anda yakin ingin menghapus penerimaan parsial ini?\n\nIni juga akan menghapus log transaksi barang masuk dan mengembalikan stok akhir gudang secara otomatis!')) return;
+
+  setStatus('syncing', 'DELETING...');
+  const idx = data.po_deliveries.findIndex(d => d.id === id);
+  if (idx === -1) { showToast('Data penerimaan tidak ditemukan!', 'error'); return; }
+
+  const del = data.po_deliveries[idx];
+
+  // 1. Hapus transaksi log masuk (IN) yang berkaitan dengan No Surat Jalan (no_sj)
+  const logIdx = data.logs.findIndex(l => l.ticket === del.no_sj && num(l.in) === num(del.qty_masuk));
+  let relatedLogId = null;
+  if (logIdx !== -1) {
+    relatedLogId = data.logs[logIdx].id;
+    data.logs.splice(logIdx, 1);
+  }
+
+  // 2. Hapus penerimaan parsial
+  data.po_deliveries.splice(idx, 1);
+
+  recalculateStok();
+  saveData();
+  addAudit('DELETE_PO_DELIVERY', `Menghapus penerimaan parsial PO ${del.no_po} surat jalan ${del.no_sj}`);
+
+  // Hapus dari cloud Supabase
+  const res1 = await syncToGAS('po_deliveries', null, 'delete', del.id);
+  if (relatedLogId) {
+    await syncToGAS('Log_Transaksi', null, 'delete', relatedLogId);
+  }
+
+  renderPoHistory();
+  showToast('✅ Penerimaan parsial & transaksi masuk berhasil dihapus!', 'success');
+}
+
 function refreshAll() {
   renderKPIs();
   renderTabs();
@@ -3347,6 +3873,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       showPanel(dash);
       if (dash === 'users') { renderUserTable(); return; }
+      if (dash === 'po') { activeTab = 'po_list'; switchPoTab('list'); return; }
 
       if (dash === 'ho') activeTab = 'ho';
       else if (dash === 'agen') activeTab = 'agen';
@@ -3376,5 +3903,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27440065bf2b882',t:'MTc4NjA4NDQwOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a274e8008b31e78b',t:'MTc4NjA5MTI4OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
