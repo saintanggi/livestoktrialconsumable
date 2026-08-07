@@ -84,6 +84,50 @@
   th { background: #0d1117; color: #8b949e; text-align: left; padding: 14px 12px; border-bottom: 1px solid #30363d; font-size: 12px; text-transform: uppercase; position: sticky; top: 0; z-index: 10; letter-spacing: 0.8px; white-space: nowrap; font-weight: 700; }
   td { padding: 12px 12px; border-bottom: 1px solid #21262d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c9d1d9; }
   tr:hover td { background: #1c2128; color: #fff; }
+  /* --- PREMIUM ANIMATION & UI STYLE OVERHAUL --- */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .skeleton-row td {
+    background: linear-gradient(90deg, #161b22 25%, #21262d 50%, #161b22 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    color: transparent !important;
+    border-color: #21262d !important;
+    cursor: default;
+  }
+  .skeleton-text {
+    height: 12px;
+    background: #30363d;
+    border-radius: 4px;
+    width: 80%;
+    display: inline-block;
+  }
+  
+  .pulse-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .pulse-dot.ok { background: #3fb950; box-shadow: 0 0 6px rgba(63, 185, 80, 0.6); }
+  .pulse-dot.warn { background: #f2a93b; box-shadow: 0 0 6px rgba(242, 169, 59, 0.6); }
+  .pulse-dot.crit { background: #f85149; box-shadow: 0 0 8px rgba(248, 81, 73, 0.8); animation: pulse 1.6s infinite; }
+
+  @keyframes pulse {
+    0% { transform: scale(0.9); opacity: 0.6; box-shadow: 0 0 4px rgba(248, 81, 73, 0.4); }
+    50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 10px rgba(248, 81, 73, 0.8); }
+    100% { transform: scale(0.9); opacity: 0.6; box-shadow: 0 0 4px rgba(248, 81, 73, 0.4); }
+  }
+
+  /* Beautiful scrollbar styling */
+  .scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll::-webkit-scrollbar-track { background: #161b22; }
+  .scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+  .scroll::-webkit-scrollbar-thumb:hover { background: #484f58; }
   
   /* Khusus Kolom Item agar Nama Panjang Tampil ke Samping Full & Tidak Melebar ke Bawah */
   .col-item { width: auto !important; min-width: 320px !important; white-space: nowrap !important; overflow: visible !important; text-overflow: clip !important; color: #fff !important; font-weight: 600 !important; font-size: 14px !important; }
@@ -553,7 +597,13 @@
         <div class="scroll">
           <table>
             <thead><tr><th>Data</th></tr></thead>
-            <tbody><tr><td class="text-muted text-center" style="padding:15px;">Loading data...</td></tr></tbody>
+            <tbody>
+              <tr class="skeleton-row"><td><div class="skeleton-text"></div></td></tr>
+              <tr class="skeleton-row"><td><div class="skeleton-text" style="width: 60%;"></div></td></tr>
+              <tr class="skeleton-row"><td><div class="skeleton-text" style="width: 75%;"></div></td></tr>
+              <tr class="skeleton-row"><td><div class="skeleton-text" style="width: 50%;"></div></td></tr>
+              <tr class="skeleton-row"><td><div class="skeleton-text" style="width: 90%;"></div></td></tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -887,6 +937,12 @@ async function syncOfflineQueue() {
 const rowsPerPage = 25;
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Set Chart.js global typography to Inter
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = '#8b949e';
+  }
+
   const display = document.getElementById('gasUrlDisplay');
   if (display) {
     display.textContent = 'Supabase: ' + SUPABASE_URL.substring(0, 40) + '...';
@@ -2488,7 +2544,7 @@ function renderContent() {
           content = '<span class="text-muted" style="font-family:monospace;">' + val + '</span>';
         } else if (c.type === 'status') {
           const badge = val || 'ok';
-          content = '<span class="badge ' + badge + '">' + getStatusText(r.buffer, r.akhir) + '</span>';
+          content = '<span class="badge ' + badge + '"><span class="pulse-dot ' + badge + '"></span>' + getStatusText(r.buffer, r.akhir) + '</span>';
         } else if (c.type === 'num') {
           content = fmt(val);
         } else if (c.type === 'num_in' || c.type === 'num_in_log') {
@@ -4056,5 +4112,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2764d443d791982',t:'MTc4NjEwNTkyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2765dc86ed7244a',t:'MTc4NjEwNjU5OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
