@@ -399,7 +399,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fb9a9f969295bb97928d9e888f949890d5929f">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="7d1c191014133d11140b180e09121e16531419">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -4223,8 +4223,12 @@ async function cleanDuplicateLogs() {
   const sortedLogs = [...data.logs].reverse();
 
   sortedLogs.forEach(l => {
-    // Kunci unik untuk mendeteksi duplikat identik
-    const key = `${formatYMD(l.tanggal)}_${String(l.ticket).trim()}_${String(l.kode).trim()}_${l.in}_${l.out}_${String(l.gerai).trim()}`;
+    // Kunci unik pintar (mengabaikan awalan 'BULK-' acak agar bisa mendeteksi duplikat upload massal yang tiketnya berbeda)
+    const isBulk = l.ticket && l.ticket.startsWith('BULK-');
+    const key = isBulk 
+      ? `${formatYMD(l.tanggal)}_${String(l.kode).trim()}_${l.in}_${l.out}_${String(l.gerai).trim()}`
+      : `${formatYMD(l.tanggal)}_${String(l.ticket).trim()}_${String(l.kode).trim()}_${l.in}_${l.out}_${String(l.gerai).trim()}`;
+      
     if (seen.has(key)) {
       duplicateIds.push(l.id);
     } else {
@@ -4713,5 +4717,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a280522a5a4cfdfb',t:'MTc4NjIxMDk4MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
