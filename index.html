@@ -399,7 +399,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3657525b5f58765a5f4053454259555d185f52">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="87e6e3eaeee9c7ebeef1e2f4f3e8e4eca9eee3">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -3037,20 +3037,43 @@ function renderWarehouseCharts(warehouseKey) {
     if (ctxHealth) {
       if (warehouseHealthChartInstance) warehouseHealthChartInstance.destroy();
       warehouseHealthChartInstance = new Chart(ctxHealth, {
-        type: 'doughnut',
+        type: 'polarArea',
         data: {
           labels: ['Aman', 'Waspada', 'Kritis'],
           datasets: [{
             data: [amanCount, waspadaCount, kritisCount],
-            backgroundColor: ['#3fb950', '#f2a93b', '#f85149'],
-            borderWidth: 0
+            backgroundColor: [
+              'rgba(63, 185, 80, 0.15)',  // Neon Green Translucent
+              'rgba(242, 169, 59, 0.15)', // Neon Yellow/Orange Translucent
+              'rgba(248, 81, 73, 0.15)'   // Neon Red Translucent
+            ],
+            borderColor: [
+              '#3fb950', // Solid Neon Green
+              '#f2a93b', // Solid Neon Yellow
+              '#f85149'  // Solid Neon Red
+            ],
+            borderWidth: 2
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          scales: {
+            r: {
+              grid: { color: '#23203f' }, // Penyelarasan dengan warna tepi panel ungu GudangKu
+              angleLines: { color: '#23203f' },
+              ticks: { display: false } // Sembunyikan angka melingkar agar tampilan sangat bersih
+            }
+          },
           plugins: {
-            legend: { position: 'bottom', labels: { color: '#c9d1d9', font: { size: 10 }, boxWidth: 10 } }
+            legend: { 
+              position: 'bottom', 
+              labels: { 
+                color: '#a29dbd', 
+                font: { size: 11, weight: '600' },
+                boxWidth: 12
+              } 
+            }
           }
         }
       });
@@ -4717,5 +4740,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a280736c5fbdd98b',t:'MTc4NjIxMjM0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2807a263ac5b15c',t:'MTc4NjIxMjYxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
