@@ -399,7 +399,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="87e6e3eaeee9c7ebeef1e2f4f3e8e4eca9eee3">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0667626b6f68466a6f7063757269656d286f62">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -1805,6 +1805,45 @@ async function pullData() {
     // Map Gerai
     if (dbGerai && dbGerai.length > 0) {
       data.gerai = dbGerai.map(g => g.nama);
+    }
+
+    // --- SELF-HEALING: BERSIHKAN ANTREAN OFFLINE YANG SEBENARNYA SUDAH SUKSES DI SUPABASE ---
+    try {
+      let queue = JSON.parse(localStorage.getItem('stock_offline_queue') || '[]');
+      if (queue.length > 0) {
+        const beforeLen = queue.length;
+        queue = queue.filter(item => {
+          if (item.action === 'bulk_append') {
+            // item.row adalah rowsToSync berisi array [[id1, ...], [id2, ...]]
+            const allIds = (item.row || []).map(r => r[0]);
+            if (allIds.length === 0) return false;
+            const alreadySynced = allIds.every(id => data.logs.some(l => l.id === id));
+            return !alreadySynced;
+          } else if (item.action === 'append' || item.action === 'update') {
+            const id = item.targetId || (item.row && item.row[0]);
+            if (!id) return false;
+            const alreadySynced = data.logs.some(l => l.id === id);
+            return !alreadySynced;
+          } else if (item.action === 'delete' || item.action === 'bulk_delete') {
+            // Jika kita menghapus data dari Supabase, dan data tersebut memang sudah tidak ada di data.logs, berarti sukses
+            const ids = item.targetId || [];
+            if (Array.isArray(ids)) {
+              const alreadyDeleted = ids.every(id => !data.logs.some(l => l.id === id));
+              return !alreadyDeleted;
+            } else {
+              const alreadyDeleted = !data.logs.some(l => l.id === item.targetId);
+              return !alreadyDeleted;
+            }
+          }
+          return true;
+        });
+        if (queue.length !== beforeLen) {
+          localStorage.setItem('stock_offline_queue', JSON.stringify(queue));
+          console.log(`[SELF-HEALING] Berhasil menghapus ${beforeLen - queue.length} antrean hantu yang sebenarnya sudah sukses tersimpan di Supabase.`);
+        }
+      }
+    } catch (err) {
+      console.error('[SELF-HEALING] Gagal memproses pembersihan antrean:', err);
     }
 
     const stok = buildStokFromMaster(data.master);
@@ -4740,5 +4779,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2807a263ac5b15c',t:'MTc4NjIxMjYxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a285c1220e71afeb',t:'MTc4NjI2Nzk1NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
