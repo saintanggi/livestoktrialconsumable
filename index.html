@@ -399,7 +399,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6c0d080105022c00051a091f18030f07420508">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="c1a0a5aca8af81ada8b7a4b2b5aea2aaefa8a5">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -794,7 +794,7 @@
 <div class="modal" id="loginModal">
   <div class="modal-card">
     <h3>🔐 Login</h3>
-    <div class="form-group"><label>Username</label><input type="text" id="loginUser" placeholder="admin"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="loginUser" placeholder="admin" autocomplete="off"></div>
     <div class="form-group"><label>Password</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
     <div class="flex">
       <button class="btn" onclick="hideLogin()">Batal</button>
@@ -1210,6 +1210,14 @@ document.addEventListener('DOMContentLoaded', function() {
       hideEditLog();
       hideEditMaster();
       hideViewFoto();
+    }
+    
+    // --- TOMBOL ENTER OTOMATIS LOGIN ---
+    // Jika modal login sedang aktif/terbuka, menekan tombol Enter akan memicu proses login otomatis!
+    const loginModal = document.getElementById('loginModal');
+    if (loginModal && loginModal.classList.contains('active') && e.key === 'Enter') {
+      e.preventDefault();
+      doLogin();
     }
   });
 });
@@ -3781,14 +3789,36 @@ function renderStokHarian(recalculate = true) {
   }
 
   activeTab = 'stok_harian';
-  const totalRows = stokHarianRows.length;
+  
+  // --- SENSOR PENCARIAN DINAMIS STOK HARIAN ---
+  let filteredRows = stokHarianRows;
+  const localSearch = (document.getElementById('localTableSearch')?.value || '').toLowerCase().trim();
+  if (localSearch) {
+    filteredRows = filteredRows.filter(r => 
+      String(r.kode).toLowerCase().includes(localSearch) || 
+      String(r.item).toLowerCase().includes(localSearch) ||
+      String(r.status).toLowerCase().includes(localSearch) ||
+      String(r.satuan).toLowerCase().includes(localSearch)
+    );
+  }
+  const globalSearch = (document.getElementById('globalSearch')?.value || '').toLowerCase().trim();
+  if (globalSearch) {
+    filteredRows = filteredRows.filter(r => 
+      String(r.kode).toLowerCase().includes(globalSearch) || 
+      String(r.item).toLowerCase().includes(globalSearch) ||
+      String(r.status).toLowerCase().includes(globalSearch) ||
+      String(r.satuan).toLowerCase().includes(globalSearch)
+    );
+  }
+
+  const totalRows = filteredRows.length;
   const totalPages = Math.ceil(totalRows / stokHarianRowsPerPage) || 1;
   
   if (stokHarianCurrentPage > totalPages) stokHarianCurrentPage = totalPages;
   if (stokHarianCurrentPage < 1) stokHarianCurrentPage = 1;
 
   const startIndex = (stokHarianCurrentPage - 1) * stokHarianRowsPerPage;
-  const paginatedRows = stokHarianRows.slice(startIndex, startIndex + stokHarianRowsPerPage);
+  const paginatedRows = filteredRows.slice(startIndex, startIndex + stokHarianRowsPerPage);
 
   document.getElementById('tableContent').innerHTML = `
     <div style="margin-bottom:10px; color:#f2a93b; font-size:12px;">📊 Laporan Stok Harian Aktif (${totalRows} baris)</div>
@@ -4771,7 +4801,12 @@ document.addEventListener('DOMContentLoaded', function() {
       if (dash === 'stok_harian') {
         activeTab = 'stok_harian';
         showPanel(dash);
-        renderStokHarian();
+        // Pastikan toolbar pencarian tetap terlihat untuk memfilter stok harian
+        const toolbar = document.getElementById('tableToolbarSection');
+        if (toolbar) toolbar.classList.remove('hidden');
+        const dateFilterBox = document.getElementById('tableDateFilterContainer');
+        if (dateFilterBox) dateFilterBox.style.display = 'none'; // Sembunyikan filter tanggal tabel, gunakan filter harian atas
+        renderStokHarian(true);
         return;
       }
 
@@ -4791,12 +4826,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('localTableSearch')?.addEventListener('input', function() {
     currentPage = 1;
-    renderContent();
+    if (activeTab === 'stok_harian') {
+      stokHarianCurrentPage = 1;
+      renderStokHarian(false);
+    } else {
+      renderContent();
+    }
   });
 
   document.getElementById('globalSearch')?.addEventListener('input', function() {
     currentPage = 1;
-    renderContent();
+    if (activeTab === 'stok_harian') {
+      stokHarianCurrentPage = 1;
+      renderStokHarian(false);
+    } else {
+      renderContent();
+    }
   });
 
   updateUI();
@@ -4807,5 +4852,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a285e3f64fc4f46d',t:'MTc4NjI2OTM4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a286007ebb4cb882',t:'MTc4NjI3MDU1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
