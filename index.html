@@ -399,7 +399,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0667626b6f68466a6f7063757269656d286f62">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="96f7f2fbfff8d6faffe0f3e5e2f9f5fdb8fff2">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -945,17 +945,38 @@ const supabaseRest = {
       // Membuat objek ini 'Thenable' agar bisa di-await secara langsung seperti Promise asli
       then: async (resolve, reject) => {
         try {
-          let url = `${baseUrl}?apikey=${apikey}`;
-          if (method === 'GET') {
-            url += `&select=${selectParam}`;
-            if (orderParam) url += `&order=${orderParam}`;
-            if (limitParam) url += `&limit=${limitParam}`;
-          }
-          if (matchField) {
-            if (inArray) {
-              url += `&${matchField}=in.(${inArray.join(',')})`;
-            } else {
-              url += `&${matchField}=eq.${matchValue}`;
+          const isVercel = window.location.hostname.endsWith('vercel.app');
+          let url;
+          
+          if (isVercel) {
+            // Rute via Vercel Serverless API Proxy (Mengantisipasi blokir Adblock Plus / Firewall IT Kantor)
+            url = `/api/supabase?table=${table}`;
+            if (method === 'GET') {
+              url += `&select=${selectParam}`;
+              if (orderParam) url += `&order=${orderParam}`;
+              if (limitParam) url += `&limit=${limitParam}`;
+            }
+            if (matchField) {
+              if (inArray) {
+                url += `&${matchField}=in.(${inArray.join(',')})`;
+              } else {
+                url += `&${matchField}=eq.${matchValue}`;
+              }
+            }
+          } else {
+            // Rute langsung ke Supabase (Untuk pengujian lokal file:/// atau non-Vercel)
+            url = `${baseUrl}?apikey=${apikey}`;
+            if (method === 'GET') {
+              url += `&select=${selectParam}`;
+              if (orderParam) url += `&order=${orderParam}`;
+              if (limitParam) url += `&limit=${limitParam}`;
+            }
+            if (matchField) {
+              if (inArray) {
+                url += `&${matchField}=in.(${inArray.join(',')})`;
+              } else {
+                url += `&${matchField}=eq.${matchValue}`;
+              }
             }
           }
 
@@ -4779,5 +4800,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a285c1220e71afeb',t:'MTc4NjI2Nzk1NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
