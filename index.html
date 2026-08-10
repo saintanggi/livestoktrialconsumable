@@ -399,7 +399,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6e0f0a0307002e0207180b1d1a010d0540070a">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="355451585c5b75595c435046415a565e1b5c51">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -1556,6 +1556,8 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
     table = 'purchase_orders';
   } else if (sheet === 'po_deliveries') {
     table = 'po_deliveries';
+  } else if (sheet === 'gerai') {
+    table = 'gerai';
   }
 
   try {
@@ -1587,6 +1589,16 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
         error = err;
       } else if (action === 'delete') {
         const { error: err } = await supabaseClient.from('master_barang').delete().eq('kode', id);
+        error = err;
+      }
+    } else if (table === 'gerai') {
+      if (action === 'append') {
+        const { error: err } = await supabaseClient.from('gerai').insert({
+          nama: row[0]
+        });
+        error = err;
+      } else if (action === 'delete') {
+        const { error: err } = await supabaseClient.from('gerai').delete().eq('nama', id);
         error = err;
       }
     } else if (table === 'purchase_orders') {
@@ -2135,7 +2147,7 @@ function renderUserTable() {
   `).join('');
 }
 
-function saveGerai() {
+async function saveGerai() {
   if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
   const nama = document.getElementById('newGeraiNama').value.trim();
   const lokasi = document.getElementById('newGeraiLokasi').value.trim();
@@ -2145,21 +2157,43 @@ function saveGerai() {
   data.gerai.push(nama);
   saveData();
   addAudit('CREATE_GERAI', `Menambah gerai baru: ${nama} (${lokasi})`);
+  
+  showToast('⏳ Menyimpan Gerai Baru di Cloud...', 'info');
+  const res = await syncToGAS('gerai', [nama], 'append');
+
   document.getElementById('newGeraiNama').value = '';
   document.getElementById('newGeraiLokasi').value = '';
   refreshAll();
-  showToast('✅ Gerai berhasil ditambahkan!', 'success');
+
+  if (res && res.isOffline) {
+    showToast('⚠️ Offline: Gerai disimpan lokal & masuk antrean sinkronisasi!', 'warn');
+  } else if (res && res.success) {
+    showToast('✅ Gerai berhasil ditambahkan & disinkronkan ke Supabase!', 'success');
+  } else {
+    showToast('❌ Gagal sinkronisasi gerai baru ke cloud!', 'error');
+  }
 }
 
-function deleteGerai(nama) {
+async function deleteGerai(nama) {
   if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
   if (data.gerai.length <= 1) { showToast('Minimal harus ada 1 gerai!', 'error'); return; }
   if (confirm(`Hapus gerai ${nama}?`)) {
     data.gerai = data.gerai.filter(g => g !== nama);
     saveData();
     addAudit('DELETE_GERAI', `Menghapus gerai: ${nama}`);
+    
+    showToast('⏳ Menghapus Gerai di Cloud...', 'info');
+    const res = await syncToGAS('gerai', null, 'delete', nama);
+    
     refreshAll();
-    showToast('✅ Gerai berhasil dihapus!', 'success');
+    
+    if (res && res.isOffline) {
+      showToast('⚠️ Offline: Penghapusan gerai dicatat lokal & masuk antrean!', 'warn');
+    } else if (res && res.success) {
+      showToast('✅ Gerai berhasil dihapus & disinkronkan ke Supabase!', 'success');
+    } else {
+      showToast('❌ Gagal menghapus gerai di cloud!', 'error');
+    }
   }
 }
 
