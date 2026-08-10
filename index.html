@@ -399,7 +399,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="4627222b2f28062a2f3023353229252d682f22">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="adccc9c0c4c3edc1c4dbc8ded9c2cec683c4c9">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -2674,9 +2674,26 @@ function renderChartsContainer() {
 }
 
 function renderGlobalGrafikDashboard() {
-  const totalHoStock = (data.ho || []).reduce((acc, item) => acc + num(item.akhir), 0);
-  const totalAgenStock = (data.agen || []).reduce((acc, item) => acc + num(item.akhir), 0);
-  const totalReturnStock = (data.return || []).reduce((acc, item) => acc + num(item.akhir), 0);
+  // --- FILTER KHUSUS BARANG KRITIS & WASPADA (RISK COMMAND CENTER) ---
+  const atRiskMaster = (data.master || []).filter(m => {
+    let targetKey = 'ho';
+    const stat = getNormalizedStatus(m.status);
+    if (stat === 'AGEN') targetKey = 'agen';
+    else if (stat === 'RETURN') targetKey = 'return';
+    
+    const stock = data[targetKey].find(i => i.kode === m.kode);
+    if (stock) {
+      return stock.status === 'crit' || stock.status === 'warn';
+    }
+    return false;
+  });
+  
+  const atRiskCodes = new Set(atRiskMaster.map(m => m.kode));
+
+  // Hitung total stok khusus untuk barang kritis/waspada
+  const totalHoStock = (data.ho || []).filter(i => i.status === 'crit' || i.status === 'warn').reduce((acc, item) => acc + num(item.akhir), 0);
+  const totalAgenStock = (data.agen || []).filter(i => i.status === 'crit' || i.status === 'warn').reduce((acc, item) => acc + num(item.akhir), 0);
+  const totalReturnStock = (data.return || []).filter(i => i.status === 'crit' || i.status === 'warn').reduce((acc, item) => acc + num(item.akhir), 0);
 
   setTimeout(() => {
     if (typeof Chart === 'undefined') {
@@ -2689,6 +2706,8 @@ function renderGlobalGrafikDashboard() {
       });
       return;
     }
+
+    // 1. CHART 1: Total Stok per Gudang (Hanya Kritis/Waspada)
     const ctxStockWh = document.getElementById('grafikGlobalStockWarehouse')?.getContext('2d');
     if (ctxStockWh) {
       if (grafikGlobalStockWarehouseInstance) grafikGlobalStockWarehouseInstance.destroy();
@@ -2697,7 +2716,7 @@ function renderGlobalGrafikDashboard() {
         data: {
           labels: ['Gudang HO', 'Gudang AGEN', 'Gudang RETURN'],
           datasets: [{
-            label: 'Total Stok',
+            label: 'Stok Kritis/Waspada',
             data: [totalHoStock, totalAgenStock, totalReturnStock],
             backgroundColor: ['#f2a93b', '#58a6ff', '#f85149'],
             borderRadius: 4
@@ -2708,15 +2727,17 @@ function renderGlobalGrafikDashboard() {
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { display: false } },
-            y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
+            x: { ticks: { color: '#a29dbd', font: { size: 10 } }, grid: { display: false } },
+            y: { ticks: { color: '#a29dbd', font: { size: 10 } }, grid: { color: '#23203f' } }
           }
         }
       });
     }
 
+    // 2. CHART 2: Tren Transaksi Harian (Hanya Kritis/Waspada)
     let dailyMap = {};
     (data.logs || []).forEach(l => {
+      if (!atRiskCodes.has(l.kode)) return; // Hanya tampilkan pergerakan barang berstatus kritis/waspada!
       let dStr = formatYMD(l.tanggal);
       if (!dailyMap[dStr]) dailyMap[dStr] = { in: 0, out: 0 };
       dailyMap[dStr].in += num(l.in);
@@ -2740,7 +2761,7 @@ function renderGlobalGrafikDashboard() {
               label: 'Total Masuk (In)',
               data: dailyInVals.length > 0 ? dailyInVals : [0],
               borderColor: '#3fb950',
-              backgroundColor: '#3fb95022',
+              backgroundColor: 'rgba(63, 185, 80, 0.15)',
               tension: 0.3,
               fill: true
             },
@@ -2748,7 +2769,7 @@ function renderGlobalGrafikDashboard() {
               label: 'Total Keluar (Out)',
               data: dailyOutVals.length > 0 ? dailyOutVals : [0],
               borderColor: '#f85149',
-              backgroundColor: '#f8514922',
+              backgroundColor: 'rgba(248, 81, 73, 0.15)',
               tension: 0.3,
               fill: true
             }
@@ -2758,18 +2779,20 @@ function renderGlobalGrafikDashboard() {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: 'bottom', labels: { color: '#c9d1d9', font: { size: 10 }, boxWidth: 10 } }
+            legend: { position: 'bottom', labels: { color: '#a29dbd', font: { size: 10 }, boxWidth: 10 } }
           },
           scales: {
-            x: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { display: false } },
-            y: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: '#21262d' } }
+            x: { ticks: { color: '#a29dbd', font: { size: 9 } }, grid: { display: false } },
+            y: { ticks: { color: '#a29dbd', font: { size: 9 } }, grid: { color: '#23203f' } }
           }
         }
       });
     }
 
+    // 3. CHART 3: Top 10 Produk Kritis/Waspada (Pergerakan Terbanyak)
     let productMovementMap = {};
     (data.logs || []).forEach(l => {
+      if (!atRiskCodes.has(l.kode)) return; // Hanya hitung pergerakan barang berstatus kritis/waspada!
       let pName = l.item || l.kode || 'Unknown';
       let totalQty = num(l.in) + num(l.out);
       productMovementMap[pName] = (productMovementMap[pName] || 0) + totalQty;
@@ -2788,7 +2811,7 @@ function renderGlobalGrafikDashboard() {
       grafikGlobalTopProductsInstance = new Chart(ctxTopProd, {
         type: 'bar',
         data: {
-          labels: topProdLabels.length > 0 ? topProdLabels : ['Belum ada data pergerakan barang'],
+          labels: topProdLabels.length > 0 ? topProdLabels : ['Belum ada data barang kritis/waspada'],
           datasets: [{
             label: 'Total Pergerakan (In + Out)',
             data: topProdValues.length > 0 ? topProdValues : [0],
@@ -2802,11 +2825,53 @@ function renderGlobalGrafikDashboard() {
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+            x: { ticks: { color: '#a29dbd', font: { size: 10 } }, grid: { color: '#23203f' } },
             y: { ticks: { color: '#c9d1d9', font: { size: 10 } }, grid: { display: false } }
           }
         }
       });
+    }
+
+    // --- 4. RENDER TABEL RINGKASAN BARANG RISIKO (KRITIS & WASPADA) ---
+    const riskTableBody = document.getElementById('globalRiskTableBody');
+    const riskCountBadge = document.getElementById('globalRiskCount');
+    
+    const riskItems = [];
+    ['ho', 'agen', 'return'].forEach(key => {
+      (data[key] || []).forEach(item => {
+        if (item.status === 'crit' || item.status === 'warn') {
+          riskItems.push({
+            kode: item.kode,
+            item: item.item,
+            gudang: key.toUpperCase(),
+            akhir: item.akhir,
+            status: item.status,
+            buffer: item.buffer
+          });
+        }
+      });
+    });
+
+    if (riskCountBadge) riskCountBadge.textContent = riskItems.length;
+
+    if (riskTableBody) {
+      if (riskItems.length === 0) {
+        riskTableBody.innerHTML = '<tr><td colspan="4" class="text-muted text-center" style="padding:15px; font-size:11px;">Aman! Tidak ada barang kritis atau waspada saat ini.</td></tr>';
+      } else {
+        riskTableBody.innerHTML = riskItems.map(r => `
+          <tr>
+            <td style="padding: 8px; font-weight:600; color:#fff;" title="${r.kode} - ${r.item}">
+              <div style="font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${r.item}</div>
+              <div style="font-size: 9px; color:#8b949e; font-family:monospace;">${r.kode}</div>
+            </td>
+            <td style="padding: 8px;"><span class="badge ${r.gudang === 'HO' ? 'ok' : 'warn'}" style="padding:1px 4px; font-size:9px;">${r.gudang}</span></td>
+            <td class="text-right" style="padding: 8px; font-weight:700; color:#fff; font-size:11px;">${fmt(r.akhir)}</td>
+            <td style="padding: 8px; text-align:center;">
+              <span class="badge ${r.status}" style="padding:1px 4px; font-size:9px;"><span class="pulse-dot ${r.status}"></span>${r.status === 'crit' ? 'KRITIS' : 'WASPADA'}</span>
+            </td>
+          </tr>
+        `).join('');
+      }
     }
   }, 50);
 }
@@ -4907,5 +4972,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a28ea91439a1b573',t:'MTc4NjM2MTM0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
