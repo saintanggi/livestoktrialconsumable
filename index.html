@@ -399,7 +399,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fb9a9f969295bb97928d9e888f949890d5929f">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="4627222b2f28062a2f3023353229252d682f22">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -435,6 +435,27 @@
           <h4>📅 Tren Transaksi Harian (Hanya Kritis & Waspada)</h4>
           <div class="chart-container" style="height: 180px;">
             <canvas id="grafikGlobalDailyTrx"></canvas>
+          </div>
+        </div>
+        <div class="chart-card" style="align-items: stretch; overflow: hidden;">
+          <h4 style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <span>🚨 Daftar Barang Kritis & Waspada (Global)</span>
+            <span class="badge crit" id="globalRiskCount" style="padding: 1px 6px; font-size: 10px; border-radius: 4px;">0</span>
+          </h4>
+          <div class="scroll" style="max-height: 180px; overflow-y: auto; margin-top: 8px; border-radius: 8px; border: 1px solid #23203f;">
+            <table style="font-size: 11px; width: 100%;">
+              <thead style="position: sticky; top: 0; z-index: 10;">
+                <tr>
+                  <th style="padding: 8px; font-size: 10px; background: #0c0a18;">Barang</th>
+                  <th style="padding: 8px; font-size: 10px; background: #0c0a18;">Gudang</th>
+                  <th style="padding: 8px; font-size: 10px; background: #0c0a18; text-align: right;">Stok</th>
+                  <th style="padding: 8px; font-size: 10px; background: #0c0a18; text-align: center;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="globalRiskTableBody">
+                <tr><td colspan="4" class="text-muted text-center" style="padding:10px; font-size: 11px;">Loading...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
         <div class="chart-card" style="grid-column: 1 / -1;">
@@ -4886,5 +4907,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a28ea91439a1b573',t:'MTc4NjM2MTM0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
