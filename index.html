@@ -226,6 +226,11 @@
   
   .sidebar-footer { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #23203f; padding-top: 10px; }
   .status-box { display: flex; align-items: center; justify-content: space-between; background: #0c0a18; padding: 6px 10px; border-radius: 8px; border: 1px solid #23203f; font-size: 11px; color: #a29dbd; }
+  
+  /* Blinding Chrome Password Manager heuristics to completely stop "Save Password" popups */
+  .masked-password-input {
+    -webkit-text-security: disc !important;
+  }
   .status { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   .dot.online { background: #3fb950; box-shadow: 0 0 10px #3fb950; }
@@ -400,7 +405,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f293969f9b9cb29e9b849781869d9199dc9b96">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ddbcb9b0b4b39db1b4abb8aea9b2beb6f3b4b9">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -736,7 +741,7 @@
       <h3>👤 Manajemen User</h3>
       <div class="form-grid" style="margin-bottom:10px;">
         <div class="form-group"><label>Username</label><input type="text" id="newUser" placeholder="username"></div>
-        <div class="form-group"><label>Password</label><input type="password" id="newPass" placeholder="password" autocomplete="new-password"></div>
+        <div class="form-group"><label>Password</label><input type="text" id="newPass" class="masked-password-input" placeholder="password" autocomplete="off"></div>
         <div class="form-group"><label>Role</label>
           <select id="newRole">
             <option value="staff">Staff</option>
@@ -824,7 +829,7 @@
   <div class="modal-card">
     <h3>🔐 Login</h3>
     <div class="form-group"><label>Username</label><input type="text" id="loginUser" placeholder="admin" autocomplete="off"></div>
-    <div class="form-group"><label>Password</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="form-group"><label>Password</label><input type="text" id="loginPass" class="masked-password-input" placeholder="••••••••" autocomplete="off"></div>
     <div class="flex">
       <button class="btn" onclick="hideLogin()">Batal</button>
       <button class="btn btn-primary" onclick="doLogin()">Masuk</button>
@@ -837,7 +842,7 @@
     <h3>👤 Edit Kredensial User</h3>
     <input type="hidden" id="editUserOldName">
     <div class="form-group"><label>Username Baru</label><input type="text" id="editUserNewName"></div>
-    <div class="form-group"><label>Password Baru</label><input type="password" id="editUserNewPass" placeholder="Kosongkan jika tidak ganti" autocomplete="new-password"></div>
+    <div class="form-group"><label>Password Baru</label><input type="text" id="editUserNewPass" class="masked-password-input" placeholder="Kosongkan jika tidak ganti" autocomplete="off"></div>
     <div class="form-group"><label>Role</label>
       <select id="editUserRole">
         <option value="staff">Staff</option>
@@ -2425,6 +2430,11 @@ function printLog(id) {
   
   .sidebar-footer { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #23203f; padding-top: 10px; }
   .status-box { display: flex; align-items: center; justify-content: space-between; background: #0c0a18; padding: 6px 10px; border-radius: 8px; border: 1px solid #23203f; font-size: 11px; color: #a29dbd; }
+  
+  /* Blinding Chrome Password Manager heuristics to completely stop "Save Password" popups */
+  .masked-password-input {
+    -webkit-text-security: disc !important;
+  }
   .status { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   .dot.online { background: #3fb950; box-shadow: 0 0 10px #3fb950; }
@@ -4989,5 +4999,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a29542024920e787',t:'MTc4NjQzMDUyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
