@@ -347,6 +347,7 @@
 <datalist id="dlAllItems"></datalist>
 <datalist id="dlHoItems"></datalist>
 <datalist id="dlAgenItems"></datalist>
+<datalist id="dlGerai"></datalist>
 
 <!-- SIDEBAR DASHBOARD DI SEBELAH KIRI -->
 <div class="sidebar">
@@ -399,7 +400,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b9d8ddd4d0d7f9d5d0cfdccacdd6dad297d0dd">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f293969f9b9cb29e9b849781869d9199dc9b96">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -725,8 +726,9 @@
           </select>
         </div>
         <div class="form-group"><label>QTY</label><input type="number" id="inQty" min="1" placeholder="0" autocomplete="off"></div>
-        <div class="form-group"><label>Gerai (Cabang)</label><select id="inGerai"></select></div>
-        <div class="form-group"><button class="btn btn-primary" onclick="submitTrx()">Simpan</button></div>
+        <div class="form-group"><label>Gerai (Cabang)</label><input type="text" id="inGerai" list="dlGerai" placeholder="🔍 Cari / ketik gerai..." autocomplete="off"></div>
+        <div class="form-group" style="grid-column: span 2;"><label>Keterangan</label><input type="text" id="inKet" placeholder="Keterangan tambahan..." autocomplete="off"></div>
+        <div class="form-group" style="justify-content: flex-end; align-items: flex-end; margin-top: 18px;"><button class="btn btn-primary" style="width: 100%;" onclick="submitTrx()">Simpan Transaksi</button></div>
       </div>
     </div>
 
@@ -3362,9 +3364,9 @@ function populateDropdowns() {
   if (dlHo) dlHo.innerHTML = hoOpts;
   if (dlAgen) dlAgen.innerHTML = agenOpts;
 
-  const geraiSelect = document.getElementById('inGerai');
-  if (geraiSelect) {
-    geraiSelect.innerHTML = (data.gerai || ['Gerai Utama']).map(g => `<option value="${g}">${g}</option>`).join('');
+  const geraiDatalist = document.getElementById('dlGerai');
+  if (geraiDatalist) {
+    geraiDatalist.innerHTML = (data.gerai || ['Gerai Utama']).map(g => `<option value="${g}"></option>`).join('');
   }
 }
 
@@ -3637,7 +3639,8 @@ async function submitTrx() {
   const kode = extractKode(document.getElementById('inItem').value);
   const jenis = document.getElementById('inJenis').value;
   const qty = parseInt(document.getElementById('inQty').value) || 0;
-  const gerai = document.getElementById('inGerai').value || 'Gerai Utama';
+  const gerai = document.getElementById('inGerai').value.trim() || 'Gerai Utama';
+  const ket = document.getElementById('inKet').value.trim() || '-';
 
   if (!kode) { showToast('Pilih barang terlebih dahulu!', 'error'); return; }
   if (qty <= 0) { showToast('QTY harus lebih dari 0!', 'error'); return; }
@@ -3663,19 +3666,27 @@ async function submitTrx() {
   data.logs.push({
     id, tanggal: tgl, ticket, kode,
     item: master.item, status: stat,
-    in: inVal, out: outVal, gerai, ket: '-', user: actor, no_resi: '-'
+    in: inVal, out: outVal, gerai, ket: ket, user: actor, no_resi: '-'
   });
+
+  // Jika nama gerai baru diketik manual & belum ada di daftar, daftarkan otomatis ke tabel gerai Supabase!
+  if (gerai !== 'Gerai Utama' && !data.gerai.includes(gerai)) {
+    data.gerai.push(gerai);
+    await syncToGAS('gerai', [gerai], 'append');
+  }
 
   recalculateStok();
   saveData();
   addAudit('INPUT_TRX', `Input transaksi ${jenis.toUpperCase()} (${qty}) ${kode} untuk gerai ${gerai}`);
   
   showToast('⏳ Menyimpan ke Cloud...', 'info');
-  const res = await syncToGAS('Log_Transaksi', [id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, '-', actor, '-'], 'append');
+  const res = await syncToGAS('Log_Transaksi', [id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, ket, actor, '-'], 'append');
   
   refreshAll();
   document.getElementById('inQty').value = '';
   document.getElementById('inItem').value = '';
+  document.getElementById('inGerai').value = '';
+  document.getElementById('inKet').value = '';
   
   if (res && res.isOffline) {
     showToast('⚠️ Offline: Transaksi disimpan lokal & masuk antrean sinkronisasi!', 'warn');
