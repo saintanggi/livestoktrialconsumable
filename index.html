@@ -406,7 +406,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="d5b4b1b8bcbb95b9bca3b0a6a1bab6befbbcb1">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3657525b5f58765a5f4053454259555d185f52">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -3454,7 +3454,25 @@ async function saveEditMaster() {
 
   if (!newKode || !newNama) { showToast('Kode dan Nama harus diisi!', 'error'); return; }
 
-  data.master[idx] = { ...old, kode: newKode, item: newNama, status: newStatus, satuan: newSatuan, buffer: newBuffer, awal: newAwal };
+  // Proses Unggah Foto Contoh Barang baru (jika dipilih, jika tidak pertahankan foto lama)
+  let fotoUrl = old.foto_barang_url || '-';
+  const fileInput = document.getElementById('editMasterFile');
+  if (fileInput && fileInput.files && fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    const extension = file.name.split('.').pop() || 'jpg';
+    const fileName = `master_${newKode}_${Date.now()}.${extension}`;
+    
+    showToast('⏳ Mengunggah foto contoh barang...', 'info');
+    try {
+      fotoUrl = await uploadFotoSj(file, fileName);
+    } catch (err) {
+      console.error('Master photo upload failed:', err);
+      const proceed = confirm(`⚠️ Gagal mengunggah foto contoh: ${err.message}.\n\nApakah Anda ingin tetap menyimpan perubahan master tanpa foto?`);
+      if (!proceed) return;
+    }
+  }
+
+  data.master[idx] = { ...old, kode: newKode, item: newNama, status: newStatus, satuan: newSatuan, buffer: newBuffer, awal: newAwal, foto_barang_url: fotoUrl };
   const oldKey = old.status === 'HO' ? 'ho' : old.status === 'AGEN' ? 'agen' : 'return';
   const newKey = newStatus === 'HO' ? 'ho' : newStatus === 'AGEN' ? 'agen' : 'return';
 
@@ -3470,7 +3488,8 @@ async function saveEditMaster() {
     akhir: newAwal,
     totalIn: 0,
     totalOut: 0,
-    kategori: newNama.split(' ')[0] || newNama
+    kategori: newNama.split(' ')[0] || newNama,
+    foto_barang_url: fotoUrl
   });
 
   recalculateStok();
@@ -3479,18 +3498,19 @@ async function saveEditMaster() {
   
   if (old.status !== newStatus) {
     await syncToGAS('Master_' + old.status, null, 'delete', old.kode);
-    const res = await syncToGAS('Master_' + newStatus, [newKode, newNama, newStatus, newSatuan, newBuffer, newAwal], 'append');
+    const res = await syncToGAS('Master_' + newStatus, [newKode, newNama, newStatus, newSatuan, newBuffer, newAwal, fotoUrl], 'append');
     if (!res.success) showToast('⚠️ Gagal sinkron perpindahan ke GAS', 'error');
     else showToast('✅ Master barang berhasil dipindah ke ' + newStatus + '!', 'success');
   } 
   else {
-    const res = await syncToGAS('Master_' + newStatus, [newKode, newNama, newStatus, newSatuan, newBuffer, newAwal], 'update', old.kode);
+    const res = await syncToGAS('Master_' + newStatus, [newKode, newNama, newStatus, newSatuan, newBuffer, newAwal, fotoUrl], 'update', old.kode);
     if (!res.success) showToast('⚠️ Gagal sinkron update ke GAS: ' + (res.message || ''), 'error');
     else showToast('✅ Master barang berhasil diperbarui!', 'success');
   }
 
+  if (fileInput) fileInput.value = '';
   hideEditMaster();
-      hideViewFoto();
+  hideViewFoto();
   refreshAll();
 }
 
@@ -5043,5 +5063,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a29dc44d9cd3e787',t:'MTc4NjUxOTc0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a29dec59f9c7514a',t:'MTc4NjUyMTM4Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
