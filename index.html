@@ -406,7 +406,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bfdedbd2d6d1ffd3d6c9dacccbd0dcd491d6db">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="d5b4b1b8bcbb95b9bca3b0a6a1bab6befbbcb1">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -715,7 +715,8 @@
         <div class="form-group"><label>Satuan</label><input type="text" id="mSatuan" value="PCS"></div>
         <div class="form-group"><label>Buffer</label><input type="number" id="mBuffer" value="0"></div>
         <div class="form-group"><label>Stok Awal</label><input type="number" id="mAwal" value="0"></div>
-        <div class="form-group"><button class="btn btn-primary" onclick="saveMaster()">Simpan Item</button></div>
+        <div class="form-group" style="grid-column: span 2;"><label>📷 Unggah Foto Contoh Barang</label><input type="file" id="mFile" accept="image/*"></div>
+        <div class="form-group" style="justify-content: flex-end; align-items: flex-end; margin-top: 18px;"><button class="btn btn-primary" style="width: 100%;" onclick="saveMaster()">Simpan Item</button></div>
       </div>
     </div>
 
@@ -931,6 +932,7 @@
     <div class="form-group"><label>Satuan</label><input type="text" id="editMasterSatuan"></div>
     <div class="form-group"><label>Buffer</label><input type="number" id="editMasterBuffer"></div>
     <div class="form-group"><label>Stok Awal</label><input type="number" id="editMasterAwal"></div>
+    <div class="form-group" style="grid-column: span 2;"><label>📷 Ganti/Unggah Foto Contoh Barang</label><input type="file" id="editMasterFile" accept="image/*"></div>
     <div class="flex">
       <button class="btn" onclick="hideEditMaster()">Batal</button>
       <button class="btn btn-primary" onclick="saveEditMaster()">Simpan</button>
@@ -1230,25 +1232,18 @@ document.addEventListener('DOMContentLoaded', function() {
   const todayStr = getLocalTodayStr();
   const defaultStart = getLocalMonthStartStr();
   
-  ['trfTgl', 'opnTgl', 'inTgl', 'editTgl', 'exportStart'].forEach(id => {
+  // --- SENSOR TANGGAL OTOMATIS (MENCEGAH SALAH INPUT TANGGAL) ---
+  // 1. Setel semua Kolom Input Transaksi (Manual, Transfer, Opname, Edit) otomatis ke TANGGAL HARI INI
+  ['trfTgl', 'opnTgl', 'inTgl', 'editTgl', 'exportEnd', 'tableFilterEnd', 'filterEnd'].forEach(id => {
     const el = document.getElementById(id);
-    if (el && !el.value) el.value = defaultStart;
+    if (el) el.value = todayStr;
   });
 
-  ['exportEnd'].forEach(id => {
+  // 2. Setel semua Kolom Filter Awal tanggal ke TANGGAL 1 BULAN BERJALAN (agar histori bulanan terlihat)
+  ['exportStart', 'tableFilterStart', 'filterStart'].forEach(id => {
     const el = document.getElementById(id);
-    if (el && !el.value) el.value = todayStr;
+    if (el) el.value = defaultStart;
   });
-  
-  const fStart = document.getElementById('filterStart');
-  const fEnd = document.getElementById('filterEnd');
-  if (fStart) fStart.value = defaultStart;
-  if (fEnd) fEnd.value = todayStr;
-
-  const tStart = document.getElementById('tableFilterStart');
-  const tEnd = document.getElementById('tableFilterEnd');
-  if (tStart) tStart.value = defaultStart;
-  if (tEnd) tEnd.value = todayStr;
 
   document.addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.key.toLowerCase() === 'i') {
@@ -1631,7 +1626,8 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
           status: row[2], // HO, AGEN, RETURN
           satuan: row[3],
           buffer: parseInt(row[4]) || 0,
-          awal: parseInt(row[5]) || 0
+          awal: parseInt(row[5]) || 0,
+          foto_barang_url: row[6] || '-'
         });
         error = err;
       } else if (action === 'update') {
@@ -1641,7 +1637,8 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
           status: row[2],
           satuan: row[3],
           buffer: parseInt(row[4]) || 0,
-          awal: parseInt(row[5]) || 0
+          awal: parseInt(row[5]) || 0,
+          foto_barang_url: row[6] || '-'
         }).eq('kode', id);
         error = err;
       } else if (action === 'delete') {
@@ -1888,7 +1885,8 @@ async function pullData() {
       status: getNormalizedStatus(m.status),
       satuan: m.satuan || 'PCS',
       buffer: parseInt(m.buffer) || 0,
-      awal: parseInt(m.awal) || 0
+      awal: parseInt(m.awal) || 0,
+      foto_barang_url: m.foto_barang_url || '-'
     }));
 
     // Map Log Transaksi
@@ -2987,6 +2985,7 @@ function renderContent() {
     rows = getMasterByStatus(status);
     cols = [
       {key: 'kode', label: 'Kode', type: 'mono'},
+      {key: 'foto_barang_url', label: 'Foto', type: 'master_photo'},
       {key: 'item', label: 'Nama', type: 'text'},
       {key: 'satuan', label: 'Satuan', type: 'text'},
       {key: 'buffer', label: 'Buffer', type: 'num'},
@@ -3130,6 +3129,8 @@ function renderContent() {
           content = '<span class="text-muted" style="font-family:monospace;">' + val + '</span>';
         } else if (c.type === 'mono_resi') {
           content = val && val !== '-' ? '<span style="font-family:monospace; font-weight:700; color:#58a6ff;">' + val + '</span>' : '<span class="text-muted">—</span>';
+        } else if (c.type === 'master_photo') {
+          content = val && val !== '-' ? `<button class="btn" style="padding:2px 6px; font-size:10px; color:#58a6ff; border-color:#58a6ff;" onclick="viewFotoSj('${val}')">📷 Lihat Foto</button>` : '<span class="text-muted">— No Foto</span>';
         } else if (c.type === 'status') {
           const badge = val || 'ok';
           content = '<span class="badge ' + badge + '"><span class="pulse-dot ' + badge + '"></span>' + getStatusText(r.buffer, r.akhir) + '</span>';
@@ -3627,8 +3628,26 @@ async function saveMaster() {
     return;
   }
 
+  // Proses Unggah Foto Contoh Barang (jika dipilih)
+  let fotoUrl = '-';
+  const fileInput = document.getElementById('mFile');
+  if (fileInput && fileInput.files && fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    const extension = file.name.split('.').pop() || 'jpg';
+    const fileName = `master_${kode}_${Date.now()}.${extension}`;
+    
+    showToast('⏳ Mengunggah foto contoh barang...', 'info');
+    try {
+      fotoUrl = await uploadFotoSj(file, fileName);
+    } catch (err) {
+      console.error('Master photo upload failed:', err);
+      const proceed = confirm(`⚠️ Gagal mengunggah foto contoh: ${err.message}.\n\nApakah Anda ingin tetap menyimpan barang tanpa foto?`);
+      if (!proceed) return;
+    }
+  }
+
   const id = genId();
-  data.master.push({ id, kode, item: nama, status, satuan, buffer, awal });
+  data.master.push({ id, kode, item: nama, status, satuan, buffer, awal, foto_barang_url: fotoUrl });
   const key = status === 'HO' ? 'ho' : status === 'AGEN' ? 'agen' : 'return';
   data[key].push({
     id,
@@ -3641,7 +3660,8 @@ async function saveMaster() {
     akhir: awal,
     totalIn: 0,
     totalOut: 0,
-    kategori: nama.split(' ')[0] || nama
+    kategori: nama.split(' ')[0] || nama,
+    foto_barang_url: fotoUrl
   });
 
   recalculateStok();
@@ -3650,11 +3670,12 @@ async function saveMaster() {
   
   showToast('⏳ Menyimpan Master Baru...', 'info');
   const targetSheet = 'Master_' + status; 
-  const res = await syncToGAS(targetSheet, [kode, nama, status, satuan, buffer, awal], 'append');
+  const res = await syncToGAS(targetSheet, [kode, nama, status, satuan, buffer, awal, fotoUrl], 'append');
   
   refreshAll();
   document.getElementById('mKode').value = '';
   document.getElementById('mNama').value = '';
+  if (fileInput) fileInput.value = '';
   
   if (res && res.isOffline) {
     showToast('⚠️ Offline: Master disimpan lokal & masuk antrean sinkronisasi!', 'warn');
@@ -5022,5 +5043,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a29dc44d9cd3e787',t:'MTc4NjUxOTc0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
