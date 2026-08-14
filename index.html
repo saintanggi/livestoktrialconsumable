@@ -406,7 +406,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3657525b5f58765a5f4053454259555d185f52">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fd9c99909493bd91948b988e89929e96d39499">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -754,6 +754,23 @@
           </select>
         </div>
         <div class="form-group" style="justify-content: flex-end; align-items: flex-end;"><button class="btn btn-primary" style="width: 100%;" onclick="createUser()">Buat User Baru</button></div>
+      </div>
+
+      <!-- FORM SETELAN EMAIL NOTIFIKASI ALERTS -->
+      <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #23203f; margin-bottom: 20px;">
+        <span style="font-size: 11px; font-weight: bold; color: #f2a93b; text-transform: uppercase; letter-spacing: 0.8px;">📧 Pengaturan Notifikasi Email (Alerts):</span>
+        <p style="font-size: 12px; color: #a29dbd; margin-top: 4px; margin-bottom: 12px;">Sistem akan mengirimkan email notifikasi secara otomatis ke alamat Anda ketika ada barang yang tingkat stoknya turun ke status Kritis atau Waspada.</p>
+        
+        <div class="form-grid">
+          <div class="form-group"><label>Email Penerima (Manager)</label><input type="email" id="emailTarget" placeholder="admin@livestock.id" autocomplete="off"></div>
+          <div class="form-group"><label>Gmail Pengirim (SMTP)</label><input type="email" id="emailSmtpUser" placeholder="livestock.alerts@gmail.com" autocomplete="off"></div>
+          <div class="form-group"><label>App Password Gmail</label><input type="password" id="emailSmtpPass" placeholder="•••• •••• •••• ••••" autocomplete="off"></div>
+          <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px;">
+            <input type="checkbox" id="emailActive" style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="emailActive" style="font-size: 12px; color: #fff; cursor: pointer; text-transform: none; font-weight: 600; letter-spacing: 0;">Aktifkan Notifikasi Email Otomatis</label>
+          </div>
+          <div class="form-group" style="justify-content: flex-end; align-items: flex-end;"><button class="btn btn-primary" style="width: 100%;" onclick="saveEmailSettings()">Simpan Setelan Email</button></div>
+        </div>
       </div>
 
       <!-- Tabel Daftar User Aktif -->
@@ -3749,9 +3766,16 @@ async function submitTrx() {
     await syncToGAS('gerai', [gerai], 'append');
   }
 
+  // Simpan status lama sebelum kalkulasi ulang
+  const prevStatus = stock.status || 'ok';
+
   recalculateStok();
   saveData();
   addAudit('INPUT_TRX', `Input transaksi ${jenis.toUpperCase()} (${qty}) ${kode} untuk gerai ${gerai}`);
+  
+  // Cek apakah transaksi ini memicu status kritis/waspada, jika ya picu email alert!
+  const newStatus = stock.status || 'ok';
+  triggerEmailAlertIfNeeded(kode, prevStatus, newStatus);
   
   showToast('⏳ Menyimpan ke Cloud...', 'info');
   const res = await syncToGAS('Log_Transaksi', [id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, ket, actor, '-'], 'append');
@@ -3824,9 +3848,17 @@ async function processTransfer() {
 
   data.logs.push(logOut, logIn);
 
+  // Simpan status lama sebelum kalkulasi ulang
+  const hoPrevStatus = hoStock.status || 'ok';
+  const agenPrevStatus = agenStock.status || 'ok';
+
   recalculateStok();
   saveData();
   addAudit('TRANSFER_STOK', `Transfer stok ${arah} sebanyak ${qty} (Tiket: ${ticket})`);
+  
+  // Cek apakah transaksi ini memicu status kritis/waspada, jika ya picu email alert!
+  triggerEmailAlertIfNeeded(hoKode, hoPrevStatus, hoStock.status || 'ok');
+  triggerEmailAlertIfNeeded(agenKode, agenPrevStatus, agenStock.status || 'ok');
   
   const rowsToSync = [
     [logOut.id, logOut.tanggal, logOut.ticket, logOut.kode, logOut.item, logOut.status, logOut.in, logOut.out, logOut.gerai, logOut.ket, logOut.user, '-'],
@@ -4541,6 +4573,91 @@ async function processResiSync() {
   reader.readAsArrayBuffer(fileInput.files[0]);
 }
 
+// --- PENGATURAN EMAIL ALERTS & SINKRONISASI ---
+function saveEmailSettings() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const target = document.getElementById('emailTarget').value.trim();
+  const smtpUser = document.getElementById('emailSmtpUser').value.trim();
+  const smtpPass = document.getElementById('emailSmtpPass').value.trim();
+  const active = document.getElementById('emailActive').checked;
+
+  if (active && (!target || !smtpUser || !smtpPass)) {
+    showToast('Harap lengkapi semua bidang SMTP untuk mengaktifkan notifikasi!', 'error');
+    return;
+  }
+
+  const settings = { target, smtpUser, smtpPass, active };
+  localStorage.setItem('stock_email_settings', JSON.stringify(settings));
+  showToast('✅ Setelan email alerts berhasil disimpan!', 'success');
+  addAudit('SAVE_EMAIL_SETTINGS', `Mengubah setelan email notifikasi ke: ${target}`);
+}
+
+function loadEmailSettings() {
+  const settingsStr = localStorage.getItem('stock_email_settings');
+  if (settingsStr) {
+    try {
+      const s = JSON.parse(settingsStr);
+      document.getElementById('emailTarget').value = s.target || '';
+      document.getElementById('emailSmtpUser').value = s.smtpUser || '';
+      document.getElementById('emailSmtpPass').value = s.smtpPass || '';
+      document.getElementById('emailActive').checked = s.active || false;
+    } catch (e) {
+      console.error('Gagal memuat setelan email:', e);
+    }
+  }
+}
+
+async function triggerEmailAlertIfNeeded(kodeItem, prevStatus, newStatus) {
+  // Hanya picu email jika status berubah dari AMAN (ok) menjadi KRITIS (crit) atau WASPADA (warn)
+  if (prevStatus === 'ok' && (newStatus === 'crit' || newStatus === 'warn')) {
+    const settingsStr = localStorage.getItem('stock_email_settings');
+    if (!settingsStr) return;
+
+    try {
+      const s = JSON.parse(settingsStr);
+      if (!s.active || !s.target) return;
+
+      const master = data.master.find(m => m.kode === kodeItem);
+      if (!master) return;
+
+      let targetKey = 'ho';
+      const stat = getNormalizedStatus(master.status);
+      if (stat === 'AGEN') targetKey = 'agen';
+      else if (stat === 'RETURN') targetKey = 'return';
+
+      const stock = data[targetKey].find(i => i.kode === kodeItem);
+      if (!stock) return;
+
+      showToast(`✉️ Mengirim email peringatan stok ${newStatus === 'crit' ? 'KRITIS' : 'WASPADA'}...`, 'info');
+      
+      const payload = {
+        item_name: master.item,
+        kode_item: kodeItem,
+        sisa_stok: stock.akhir,
+        buffer: master.buffer,
+        status: newStatus,
+        target_email: s.target,
+        smtp_user: s.smtpUser,
+        smtp_pass: s.smtpPass
+      };
+
+      const response = await fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        showToast('📧 Email notifikasi berhasil dikirim!', 'success');
+      } else {
+        console.error('Failed to send email:', await response.json());
+      }
+    } catch (e) {
+      console.error('Trigger email failed:', e);
+    }
+  }
+}
+
 async function cleanDuplicateLogs() {
   if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
   
@@ -5022,7 +5139,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       showPanel(dash);
-      if (dash === 'users') { renderUserTable(); return; }
+      if (dash === 'users') { renderUserTable(); loadEmailSettings(); return; }
       if (dash === 'po') { activeTab = 'po_list'; switchPoTab('list'); return; }
 
       if (dash === 'ho') activeTab = 'ho';
@@ -5057,11 +5174,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   updateUI();
   updateOfflineStatusUI();
+  loadEmailSettings();
   
   setTimeout(() => {
     testGASConnection().then(() => pullData());
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a29dec59f9c7514a',t:'MTc4NjUyMTM4Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
