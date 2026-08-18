@@ -168,9 +168,19 @@ module.exports = async (req, res) => {
       </div>
     `;
 
+    const cleanTarget = (s.target_email || "")
+      .replace(/;/g, ',')
+      .split(',')
+      .map(email => email.trim())
+      .filter(email => email.length > 0)
+      .slice(0, 5)
+      .join(', ');
+
+    const finalTarget = cleanTarget || "admin@livestock.id";
+
     const info = await transporter.sendMail({
       from: `"LiveStock Daily Reports" <${s.smtp_user}>`,
-      to: s.target_email,
+      to: finalTarget,
       subject: subject,
       html: htmlContent
     });

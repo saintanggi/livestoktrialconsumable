@@ -83,14 +83,25 @@ module.exports = async (req, res) => {
     </div>
   `;
 
+  // Bersihkan target_email (mendukung banyak email, dipisahkan koma atau titik koma, maksimal 5 email)
+  const cleanTarget = (target_email || "")
+    .replace(/;/g, ',')
+    .split(',')
+    .map(email => email.trim())
+    .filter(email => email.length > 0)
+    .slice(0, 5) // Batasi maksimal 5 email penerima untuk keamanan/anti-spam
+    .join(', ');
+
+  const finalTarget = cleanTarget || "admin@livestock.id";
+
   try {
     const info = await transporter.sendMail({
       from: `"LiveStock Alerts" <${SMTP_USER}>`,
-      to: target_email || "admin@livestock.id",
+      to: finalTarget,
       subject: subject,
       html: htmlContent
     });
-    res.status(200).json({ success: true, messageId: info.messageId });
+    res.status(200).json({ success: true, messageId: info.messageId, recipientCount: finalTarget.split(',').length, recipients: finalTarget });
   } catch (error) {
     console.error("Email send failed:", error);
     res.status(500).json({ error: error.message });
