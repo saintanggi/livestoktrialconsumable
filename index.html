@@ -406,7 +406,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="7f1e1b1216113f1316091a0c0b101c1451161b">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3051545d595e705c59465543445f535b1e5954">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -769,7 +769,10 @@
             <input type="checkbox" id="emailActive" style="width: 18px; height: 18px; cursor: pointer;">
             <label for="emailActive" style="font-size: 12px; color: #fff; cursor: pointer; text-transform: none; font-weight: 600; letter-spacing: 0;">Aktifkan Notifikasi Email Otomatis</label>
           </div>
-          <div class="form-group" style="justify-content: flex-end; align-items: flex-end;"><button class="btn btn-primary" style="width: 100%;" onclick="saveEmailSettings()">Simpan Setelan Email</button></div>
+          <div class="form-group" style="justify-content: flex-end; align-items: flex-end; flex-direction: row; gap: 10px;">
+            <button class="btn" id="testEmailBtn" style="color: #3fb950; border-color: #3fb95033; background: #3fb95010; font-weight: 600;" onclick="sendTestEmail()">🧪 Kirim Email Uji Coba</button>
+            <button class="btn btn-primary" onclick="saveEmailSettings()">Simpan Setelan Email</button>
+          </div>
         </div>
       </div>
 
@@ -4658,6 +4661,57 @@ async function triggerEmailAlertIfNeeded(kodeItem, prevStatus, newStatus) {
   }
 }
 
+async function sendTestEmail() {
+  if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
+  const target = document.getElementById('emailTarget').value.trim();
+  const smtpUser = document.getElementById('emailSmtpUser').value.trim();
+  const smtpPass = document.getElementById('emailSmtpPass').value.trim();
+  
+  if (!target || !smtpUser || !smtpPass) {
+    showToast('Harap lengkapi semua bidang SMTP sebelum melakukan uji coba!', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('testEmailBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Mengirim...'; }
+  showToast('✉️ Mengirim email uji coba...', 'info');
+
+  try {
+    const response = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        item_name: 'CONTOH BARANG UJI COBA',
+        kode_item: 'HO_TEST9999',
+        sisa_stok: 5,
+        buffer: 10,
+        status: 'crit',
+        target_email: target,
+        smtp_user: smtpUser,
+        smtp_pass: smtpPass
+      })
+    });
+
+    const res = await response.json();
+    if (response.ok && res.success) {
+      showToast('📧 Email uji coba berhasil terkirim! Periksa inbox Anda.', 'success');
+    } else {
+      const errMsg = res.error || 'Gagal mengirim email';
+      console.error('Email test failed:', res);
+      alert(`❌ Gagal mengirim email: ${errMsg}
+
+Tips Penting:
+1. Jika pengirim menggunakan GMAIL, Anda Wajib menggunakan "App Password" (Sandi Aplikasi) 16 karakter dari Google Account Security Anda!
+2. Penggunaan Password reguler Gmail Anda akan otomatis ditolak oleh keamanan Google (eror 535).`);
+    }
+  } catch (e) {
+    console.error('Test email failed:', e);
+    showToast('❌ Gagal koneksi ke server email: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🧪 Kirim Email Uji Coba'; }
+  }
+}
+
 async function cleanDuplicateLogs() {
   if (!isAdmin()) { showToast('Akses terbatas admin!', 'error'); return; }
   
@@ -5181,5 +5235,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cf00cfeb25ea82',t:'MTc4NzAzNjAyNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
