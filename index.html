@@ -406,7 +406,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3051545d595e705c59465543445f535b1e5954">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0a6b6e6763644a66637c6f797e65696124636e">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -1630,6 +1630,8 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
     table = 'po_deliveries';
   } else if (sheet === 'gerai') {
     table = 'gerai';
+  } else if (sheet === 'email_settings') {
+    table = 'email_settings';
   }
 
   try {
@@ -1673,6 +1675,20 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
         error = err;
       } else if (action === 'delete') {
         const { error: err } = await supabaseClient.from('gerai').delete().eq('nama', id);
+        error = err;
+      }
+    } else if (table === 'email_settings') {
+      if (action === 'append') {
+        const { error: err } = await supabaseClient.from('email_settings').insert({
+          target_email: row[0],
+          smtp_user: row[1],
+          smtp_pass: row[2],
+          active: row[3] === true
+        });
+        error = err;
+      } else if (action === 'delete_all') {
+        // Hapus semua baris setelan lama agar hanya ada 1 setelan aktif
+        const { error: err } = await supabaseClient.from('email_settings').delete().not('id', 'is', null);
         error = err;
       }
     } else if (table === 'purchase_orders') {
@@ -1928,6 +1944,27 @@ async function pullData() {
     // Map Gerai
     if (dbGerai && dbGerai.length > 0) {
       data.gerai = dbGerai.map(g => g.nama);
+    }
+
+    // 6. Tarik Setelan Email dari Supabase untuk menyelaraskan lokal browser secara otomatis
+    try {
+      const { data: dbEmailSettings, error: emailSettingsErr } = await supabaseClient
+        .from('email_settings')
+        .select('*')
+        .limit(1);
+      if (dbEmailSettings && dbEmailSettings.length > 0) {
+        const s = dbEmailSettings[0];
+        const settingsObj = {
+          target: s.target_email,
+          smtpUser: s.smtp_user,
+          smtpPass: s.smtp_pass,
+          active: s.active
+        };
+        localStorage.setItem('stock_email_settings', JSON.stringify(settingsObj));
+        loadEmailSettings();
+      }
+    } catch (err) {
+      console.warn('Setelan email belum disinkronkan di Cloud.', err);
     }
 
     // --- SELF-HEALING: BERSIHKAN ANTREAN OFFLINE YANG SEBENARNYA SUDAH SUKSES DI SUPABASE ---
@@ -4577,7 +4614,7 @@ async function processResiSync() {
 }
 
 // --- PENGATURAN EMAIL ALERTS & SINKRONISASI ---
-function saveEmailSettings() {
+async function saveEmailSettings() {
   if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
   const target = document.getElementById('emailTarget').value.trim();
   const smtpUser = document.getElementById('emailSmtpUser').value.trim();
@@ -4591,8 +4628,19 @@ function saveEmailSettings() {
 
   const settings = { target, smtpUser, smtpPass, active };
   localStorage.setItem('stock_email_settings', JSON.stringify(settings));
-  showToast('✅ Setelan email alerts berhasil disimpan!', 'success');
   addAudit('SAVE_EMAIL_SETTINGS', `Mengubah setelan email notifikasi ke: ${target}`);
+
+  // SINKRONKAN SETELAN EMAIL KE CLOUD SUPABASE (DIBUTUHKAN UNTUK DAILY CRON ALERTS!)
+  showToast('⏳ Menyinkronkan setelan email ke Cloud...', 'info');
+  // Hapus setelan lama terlebih dahulu di Supabase (karena kita hanya menyimpan 1 baris aktif)
+  await syncToGAS('email_settings', null, 'delete_all', null);
+  const res = await syncToGAS('email_settings', [target, smtpUser, smtpPass, active], 'append');
+
+  if (res && res.success) {
+    showToast('✅ Setelan email alerts berhasil disimpan & disinkronkan ke Cloud!', 'success');
+  } else {
+    showToast('⚠️ Setelan disimpan lokal, gagal sinkron ke Cloud (Offline).', 'warn');
+  }
 }
 
 function loadEmailSettings() {
@@ -5235,5 +5283,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cf5b299ed4e78b',t:'MTc4NzAzOTcyNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
