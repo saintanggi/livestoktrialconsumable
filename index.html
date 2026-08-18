@@ -406,7 +406,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fd9c99909493bd91948b988e89929e96d39499">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="7f1e1b1216113f1316091a0c0b101c1451161b">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -3154,10 +3154,10 @@ function renderContent() {
         } else if (c.type === 'num') {
           content = fmt(val);
         } else if (c.type === 'num_in' || c.type === 'num_in_log') {
-          content = (val !== '-' && val !== '' && num(val) > 0) ? '+' + fmt(val) : '—';
+          content = (val !== '-' && val !== '' && num(val) > 0) ? '+' + fmt(val) : '';
           if (val !== '-' && val !== '' && num(val) > 0) tdCls += ' text-success';
         } else if (c.type === 'num_out' || c.type === 'num_out_log') {
-          content = (val !== '-' && val !== '' && num(val) > 0) ? '-' + fmt(val) : '—';
+          content = (val !== '-' && val !== '' && num(val) > 0) ? '-' + fmt(val) : '';
           if (val !== '-' && val !== '' && num(val) > 0) tdCls += ' text-danger';
         } else if (c.type === 'action_master') {
           content = !isLoggedIn() ? '—' : `
@@ -3228,8 +3228,8 @@ function exportLogByWarehouse(warehouse) {
     "KODE ITEM": l.kode,
     "NAMA BARANG": l.item,
     "GUDANG": l.status,
-    "MASUK (IN)": l.in,
-    "KELUAR (OUT)": l.out,
+    "MASUK (IN)": (l.in === '-' || l.in === '') ? '' : num(l.in),
+    "KELUAR (OUT)": (l.out === '-' || l.out === '') ? '' : num(l.out),
     "GERAI": l.gerai || '-',
     "KETERANGAN": l.ket || '-',
     "USER / OPERATOR": l.user || 'System'
@@ -5181,5 +5181,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cf00cfeb25ea82',t:'MTc4NzAzNjAyNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
