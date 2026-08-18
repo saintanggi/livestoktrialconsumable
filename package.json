@@ -1,0 +1,9 @@
+{
+  "name": "livestock-gudang",
+  "version": "1.0.0",
+  "description": "Sistem Live Stock & Pergudangan Modern",
+  "main": "index.html",
+  "dependencies": {
+    "nodemailer": "^6.9.14"
+  }
+}
