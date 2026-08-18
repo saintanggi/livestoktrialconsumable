@@ -409,7 +409,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="dfbebbb2b6b19fb3b6a9baacabb0bcb4f1b6bb">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="49282d2420270925203f2c3a3d262a2267202d">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -1792,10 +1792,11 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
     return { success: true };
   } catch (error) {
     console.error('Supabase sync failed, queuing to outbox:', error);
+    const errText = error.message || error.error || (typeof error === 'object' ? JSON.stringify(error) : String(error));
     if (!skipQueue) {
       addToOfflineQueue(action, sheet, row, id);
     }
-    return { success: false, message: 'Offline: Disimpan di antrean lokal. ' + error.message, isOffline: true };
+    return { success: false, message: 'Gagal: ' + errText, isOffline: true };
   }
 }
 
@@ -4693,7 +4694,8 @@ async function saveEmailSettings() {
   if (res && res.success) {
     showToast(`✅ Setelan ${emails.length} email alerts berhasil disimpan & disinkronkan!`, 'success');
   } else {
-    showToast('⚠️ Setelan disimpan lokal, gagal sinkron ke Cloud (Offline).', 'warn');
+    const errMsg = res ? res.message : 'Koneksi terputus';
+    showToast(`⚠️ ${errMsg}`, 'error');
   }
 }
 
@@ -5337,5 +5339,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cfbdca4f2a8740',t:'MTc4NzA0Mzc2NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cfcb59889a62b7',t:'MTc4NzA0NDMyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
