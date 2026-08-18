@@ -395,7 +395,10 @@
         <span>⚠️ Antrean Lokal (Offline)</span>
         <span id="offlineQueueCount" class="badge warn" style="padding:1px 5px; font-size:9px; border-radius:4px;">0</span>
       </span>
-      <button class="btn btn-primary" style="padding:3px 6px; font-size:10px; width:100%; font-weight:600; background:#f2a93b; color:#000;" onclick="syncOfflineQueue()">🔄 Sinkron Sekarang</button>
+      <div style="display: flex; gap: 6px; width: 100%;">
+        <button class="btn btn-primary" style="padding:3px 6px; font-size:10px; flex: 1; font-weight:600; background:#f2a93b; color:#000;" onclick="syncOfflineQueue()">🔄 Sinkron</button>
+        <button class="btn btn-danger" style="padding:3px 6px; font-size:10px; flex: 1; font-weight:600; background:#ff4a4d1a; border-color:#ff4a4d33; color:#ff4a4d;" onclick="clearOfflineQueue()">🗑️ Kosongkan</button>
+      </div>
     </div>
 
     <button class="btn btn-primary" onclick="showLogin()" id="loginBtn" style="width:100%;">🔐 Login</button>
@@ -406,7 +409,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="553431383c3b15393c233026213a363e7b3c31">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a9c8cdc4c0c7e9c5c0dfccdaddc6cac287c0cd">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -983,6 +986,7 @@ const supabaseRest = {
 
     let limitParam = null;
     let preferUpsert = false;
+    let matchOperator = 'eq';
 
     const builder = {
       select: (query = '*') => {
@@ -1021,11 +1025,22 @@ const supabaseRest = {
       eq: (field, value) => {
         matchField = field;
         matchValue = value;
+        matchOperator = 'eq';
         return builder;
       },
       in: (field, valuesArray) => {
         matchField = field;
         inArray = valuesArray;
+        return builder;
+      },
+      not: (field, operator, value) => {
+        matchField = field;
+        matchOperator = 'not';
+        if (operator === 'is' && value === null) {
+          matchValue = 'is.null';
+        } else {
+          matchValue = `${operator}.${value}`;
+        }
         return builder;
       },
       // Membuat objek ini 'Thenable' agar bisa di-await secara langsung seperti Promise asli
@@ -1046,7 +1061,7 @@ const supabaseRest = {
               if (inArray) {
                 url += `&${matchField}=in.(${inArray.join(',')})`;
               } else {
-                url += `&${matchField}=eq.${matchValue}`;
+                url += `&${matchField}=${matchOperator}.${matchValue}`;
               }
             }
           } else {
@@ -1061,7 +1076,7 @@ const supabaseRest = {
               if (inArray) {
                 url += `&${matchField}=in.(${inArray.join(',')})`;
               } else {
-                url += `&${matchField}=eq.${matchValue}`;
+                url += `&${matchField}=${matchOperator}.${matchValue}`;
               }
             }
           }
@@ -1150,6 +1165,14 @@ function updateOfflineStatusUI() {
     } else {
       box.style.display = 'none';
     }
+  }
+}
+
+function clearOfflineQueue() {
+  if (confirm('Apakah Anda yakin ingin mengosongkan semua antrean transaksi offline yang tertunda?')) {
+    localStorage.removeItem('stock_offline_queue');
+    updateOfflineStatusUI();
+    showToast('🗑️ Antrean offline berhasil dikosongkan!', 'success');
   }
 }
 
@@ -5313,5 +5336,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cf6920ac12aa09',t:'MTc4NzA0MDI5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cf844d99eddd77',t:'MTc4NzA0MTQxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
