@@ -409,7 +409,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="49282d2420270925203f2c3a3d262a2267202d">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="1a7b7e7773745a76736c7f696e75797134737e">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -1091,8 +1091,14 @@ const supabaseRest = {
           });
 
           if (!response.ok) {
-            const err = await response.json();
-            throw err;
+            const errText = await response.text();
+            let parsedErr;
+            try {
+              parsedErr = JSON.parse(errText);
+            } catch (e) {
+              parsedErr = { message: `HTTP ${response.status}: ${errText || response.statusText}` };
+            }
+            throw parsedErr;
           }
 
           let resData = null;
@@ -1701,19 +1707,16 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
         error = err;
       }
     } else if (table === 'email_settings') {
-      if (action === 'append') {
-        const { error: err } = await supabaseClient.from('email_settings').insert({
+      if (action === 'append' || action === 'upsert') {
+        // Gunakan ID tetap '1' agar tidak terjadi duplikasi data setelan, sehingga tidak membutuhkan DELETE (bebas eror)
+        const { error: err } = await supabaseClient.from('email_settings').upsert({
+          id: 1,
           target_email: row[0],
           smtp_user: row[1],
           smtp_pass: row[2],
           active: row[3] === true
         });
         error = err;
-      } else if (action === 'delete_all') {
-        // Hapus semua baris setelan lama agar hanya ada 1 setelan aktif secara bertahap (aman & kompatibel penuh)
-        const { error: err1 } = await supabaseClient.from('email_settings').delete().eq('active', true);
-        const { error: err2 } = await supabaseClient.from('email_settings').delete().eq('active', false);
-        error = err1 || err2;
       }
     } else if (table === 'purchase_orders') {
       if (action === 'append') {
@@ -4687,9 +4690,7 @@ async function saveEmailSettings() {
 
   // SINKRONKAN SETELAN EMAIL KE CLOUD SUPABASE (DIBUTUHKAN UNTUK DAILY CRON ALERTS!)
   showToast('⏳ Menyinkronkan setelan email ke Cloud...', 'info');
-  // Hapus setelan lama terlebih dahulu di Supabase (karena kita hanya menyimpan 1 baris aktif)
-  await syncToGAS('email_settings', null, 'delete_all', null);
-  const res = await syncToGAS('email_settings', [normalizedTarget, smtpUser, smtpPass, active], 'append');
+  const res = await syncToGAS('email_settings', [normalizedTarget, smtpUser, smtpPass, active], 'upsert');
 
   if (res && res.success) {
     showToast(`✅ Setelan ${emails.length} email alerts berhasil disimpan & disinkronkan!`, 'success');
@@ -5339,5 +5340,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cfcb59889a62b7',t:'MTc4NzA0NDMyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cfd7cc2b6c8093',t:'MTc4NzA0NDgzMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
