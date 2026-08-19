@@ -126,6 +126,8 @@ module.exports = async (req, res) => {
       `;
     }).join('');
 
+    const subject = `📋 [LAPORAN HARIAN GUDANG] Terdeteksi ${riskItems.length} Barang Membutuhkan Restock`;
+
     const htmlContent = `
       <div style="font-family: 'Inter', Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #23203f; border-radius: 12px; overflow: hidden; background: #0c0a18; box-shadow: 0 8px 32px rgba(0,0,0,0.3); color: #e1dfec;">
         <div style="background: linear-gradient(135deg, #131024, #7c3aed44); border-bottom: 1px solid #23203f; padding: 28px; text-align: center;">
