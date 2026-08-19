@@ -126,14 +126,17 @@ module.exports = async (req, res) => {
       `;
     }).join('');
 
-    const subject = `📋 [LAPORAN HARIAN GUDANG] Terdeteksi ${riskItems.length} Barang Membutuhkan Restock`;
+    const critCount = riskItems.filter(r => r.status === 'crit').length;
+    const warnCount = riskItems.filter(r => r.status === 'warn').length;
+
+    const subject = `📋 [LAPORAN HARIAN GUDANG] Terdeteksi ${critCount} Kritis & ${warnCount} Waspada (Butuh Restock)`;
 
     const htmlContent = `
       <div style="font-family: 'Inter', Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #23203f; border-radius: 12px; overflow: hidden; background: #0c0a18; box-shadow: 0 8px 32px rgba(0,0,0,0.3); color: #e1dfec;">
         <div style="background: linear-gradient(135deg, #131024, #7c3aed44); border-bottom: 1px solid #23203f; padding: 28px; text-align: center;">
           <span style="font-size: 36px;">📋</span>
           <h1 style="margin: 10px 0 0 0; font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.5px;">LAPORAN STOK HARIAN GUDANG</h1>
-          <p style="margin: 4px 0 0 0; font-size: 13px; color: #ff6b6b; font-weight: 700; letter-spacing: 0.5px;">⚠️ TERDETEKSI ${riskItems.length} BARANG MEMUTUHKAN RESTOCK SEGERA</p>
+          <p style="margin: 4px 0 0 0; font-size: 13px; color: #ff6b6b; font-weight: 700; letter-spacing: 0.5px;">⚠️ TERDETEKSI ${critCount} BARANG KRITIS & ${warnCount} BARANG WASPADA YANG MEMBUTUHKAN RESTOCK SEGERA</p>
         </div>
         <div style="padding: 24px; background: #131024;">
           <p style="margin-top: 0; font-size: 15px; color: #fff; font-weight: 600;">Halo Administrator,</p>
