@@ -409,7 +409,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="dbbabfb6b2b59bb7b2adbea8afb4b8b0f5b2bf">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f697929b9f98b69a9f8093858299959dd89f92">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -4428,7 +4428,9 @@ async function processBulk() {
         const jenis = String(r[3] || 'out').toLowerCase();
         const qty = Number(r[4]) || 0;
         const gerai = String(r[5] || 'Gerai Utama');
-        const ket = String(r[6] || 'Upload Massal');
+        // Jika kolom keterangan di Excel kosong, biarkan kosong ('-') — jangan diisi otomatis 'Upload Massal'
+        const ketRaw = (r[6] === undefined || r[6] === null) ? '' : String(r[6]).trim();
+        const ket = ketRaw !== '' ? ketRaw : '-';
 
         if (!kode || qty <= 0) continue;
 
