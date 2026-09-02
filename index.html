@@ -409,7 +409,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="cfaeaba2a6a18fa3a6b9aabcbba0aca4e1a6ab">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="dbbabfb6b2b59bb7b2adbea8afb4b8b0f5b2bf">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -816,6 +816,15 @@
       <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('AGEN')">📥 Excel AGEN</button>
       <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('RETURN')">📥 Excel RETURN</button>
       <button class="btn btn-primary" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('ALL')">📥 Excel Semua</button>
+    </div>
+
+    <!-- PANEL DOWNLOAD REKAP STOK TERPISAH (HO / AGEN / RETURN) -->
+    <div class="export-panel" id="exportStokPanel">
+      <span style="font-size: 11px; font-weight: bold; color: #3fb950;">📦 Download Rekap Stok (Total In, Total Out &amp; Stok Akhir):</span>
+      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportStokByWarehouse('ho')">📥 Stok HO</button>
+      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportStokByWarehouse('agen')">📥 Stok AGEN</button>
+      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportStokByWarehouse('return')">📥 Stok RETURN</button>
+      <span style="font-size: 10px; color: #8b949e;">💡 Jika filter tanggal tabel stok aktif, file mengikuti periode tersebut.</span>
     </div>
 
     <!-- Grafik / Analytics -->
@@ -2413,6 +2422,8 @@ function showPanel(dash) {
   if (kpiRow) kpiRow.style.display = isMainWarehouse ? 'grid' : 'none';
   if (chartsSection) chartsSection.style.display = isMainWarehouse ? 'block' : 'none';
   if (exportLogPanel) exportLogPanel.style.display = isMainWarehouse ? 'flex' : 'none';
+  const exportStokPanelEl = document.getElementById('exportStokPanel');
+  if (exportStokPanelEl) exportStokPanelEl.style.display = isMainWarehouse ? 'flex' : 'none';
 }
 
 function renderKPIs() {
@@ -2457,11 +2468,15 @@ function renderTabs() {
   if (nonStandardDashboards.includes(activeDash)) {
     tabBar.style.display = 'none';
     if (exportPanel) exportPanel.style.display = 'none';
+    const stokPanelEl = document.getElementById('exportStokPanel');
+    if (stokPanelEl) stokPanelEl.style.display = 'none';
     tabBar.innerHTML = '';
     return;
   } else {
     tabBar.style.display = 'flex';
     if (exportPanel) exportPanel.style.display = 'flex';
+    const stokPanelEl = document.getElementById('exportStokPanel');
+    if (stokPanelEl) stokPanelEl.style.display = 'flex';
   }
 
   let tabs = [];
@@ -3384,6 +3399,58 @@ function exportLogByWarehouse(warehouse) {
   XLSX.utils.book_append_sheet(wb, ws, `Log_${warehouse}`);
   XLSX.writeFile(wb, `Log_Transaksi_${warehouse}_${start}_sd_${end}.xlsx`);
   showToast(`✅ File Excel Log ${warehouse} berhasil didownload!`, 'success');
+}
+
+// ===== DOWNLOAD REKAP STOK TERPISAH (HO / AGEN / RETURN) =====
+// Mengunduh rekap stok per gudang lengkap dengan Total In, Total Out & Stok Akhir.
+// Jika filter tanggal tabel stok sedang aktif, hasil download otomatis mengikuti periode tersebut.
+function exportStokByWarehouse(key) {
+  const label = key.toUpperCase();
+  const fStartVal = document.getElementById('tableFilterStart')?.value || '';
+  const fEndVal = document.getElementById('tableFilterEnd')?.value || '';
+  const periodMode = tableDateFilterTouched && (fStartVal || fEndVal);
+
+  const rows = periodMode ? getStockRowsForPeriod(key, fStartVal, fEndVal) : (data[key] || []);
+
+  if (!rows.length) {
+    showToast(`Tidak ada data stok ${label} untuk didownload!`, 'error');
+    return;
+  }
+
+  const awalLabel = periodMode ? 'AWAL PERIODE' : 'STOK AWAL';
+  const akhirLabel = periodMode ? 'AKHIR PERIODE' : 'STOK AKHIR';
+
+  const exportRows = rows.map((r, idx) => {
+    const row = {};
+    row['NO'] = idx + 1;
+    row['KODE'] = r.kode;
+    row['NAMA BARANG'] = r.item;
+    row['SATUAN'] = r.satuan || 'PCS';
+    row[awalLabel] = num(r.awal);
+    row['BUFFER'] = num(r.buffer);
+    row['TOTAL IN'] = num(r.totalIn);
+    row['TOTAL OUT'] = num(r.totalOut);
+    row[akhirLabel] = num(r.akhir);
+    row['STATUS'] = statusLabel[r.status] || 'AMAN';
+    return row;
+  });
+
+  if (typeof XLSX === 'undefined') {
+    showToast('❌ Fitur ekspor Excel tidak aktif karena CDN SheetJS (XLSX) tidak dapat dimuat!', 'error');
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `Stok_${label}`);
+
+  const suffix = periodMode
+    ? `${fStartVal || 'awal'}_sd_${fEndVal || 'akhir'}`
+    : 'Total_Berjalan';
+  XLSX.writeFile(wb, `Rekap_Stok_${label}_${suffix}.xlsx`);
+
+  const periodeMsg = periodMode ? ` (periode ${fStartVal || '…'} s/d ${fEndVal || '…'})` : '';
+  showToast(`✅ Rekap Stok ${label}${periodeMsg} berhasil didownload!`, 'success');
 }
 
 function renderWarehouseCharts(warehouseKey) {
@@ -5412,5 +5479,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a34961296fc36d44',t:'MTc4ODMxOTIzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
