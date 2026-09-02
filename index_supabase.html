@@ -409,7 +409,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="1a7b7e7773745a76736c7f696e75797134737e">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="cfaeaba2a6a18fa3a6b9aabcbba0aca4e1a6ab">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -832,9 +832,9 @@
         </div>
         <div class="date-filter-box" id="tableDateFilterContainer">
           <span>📅 Filter:</span>
-          <input type="date" id="tableFilterStart" value="2026-08-01" onchange="currentPage=1; renderContent()">
+          <input type="date" id="tableFilterStart" value="2026-08-01" onchange="currentPage=1; tableDateFilterTouched=true; renderContent()">
           <span>s/d</span>
-          <input type="date" id="tableFilterEnd" value="2026-08-04" onchange="currentPage=1; renderContent()">
+          <input type="date" id="tableFilterEnd" value="2026-08-04" onchange="currentPage=1; tableDateFilterTouched=true; renderContent()">
           <button class="btn" style="padding: 3px 6px; font-size: 10px;" onclick="resetTableDateFilter()">Reset</button>
         </div>
       </div>
@@ -1617,6 +1617,54 @@ function recalculateStok() {
   });
 
   saveData();
+}
+
+// ===== STOK PER PERIODE (Filter Tanggal di Tab Stok HO/AGEN/RETURN) =====
+// Menghitung snapshot stok untuk rentang tanggal tertentu:
+// - Awal Periode = Stok Awal master + seluruh mutasi (IN-OUT) SEBELUM tanggal mulai
+// - Total In/Out = hanya transaksi DI DALAM rentang tanggal
+// - Akhir Periode = Awal Periode + Total In - Total Out
+function getStockRowsForPeriod(key, startVal, endVal) {
+  const statusMap = { ho: 'HO', agen: 'AGEN', return: 'RETURN' };
+  const targetStatus = statusMap[key];
+
+  const rows = (data[key] || []).map(item => Object.assign({}, item, {
+    awal: num(item.awal),
+    totalIn: 0,
+    totalOut: 0,
+    akhir: 0
+  }));
+
+  const byKode = {};
+  rows.forEach(r => { byKode[r.kode] = r; });
+
+  (data.logs || []).forEach(log => {
+    if (getNormalizedStatus(log.status) !== targetStatus) return;
+    const item = byKode[log.kode];
+    if (!item) return;
+
+    const d = formatYMD(log.tanggal);
+    if (endVal && d > endVal) return; // transaksi setelah periode: diabaikan
+
+    const valIn = (log.in !== '-' && log.in !== '') ? num(log.in) : 0;
+    const valOut = (log.out !== '-' && log.out !== '') ? num(log.out) : 0;
+
+    if (startVal && d < startVal) {
+      // transaksi sebelum periode: masuk ke saldo Awal Periode
+      item.awal += valIn - valOut;
+    } else {
+      // transaksi di dalam periode
+      item.totalIn += valIn;
+      item.totalOut += valOut;
+    }
+  });
+
+  rows.forEach(r => {
+    r.akhir = r.awal + r.totalIn - r.totalOut;
+    r.status = statusBadge(r.buffer, r.akhir);
+  });
+
+  return rows;
 }
 
 function showToast(message, type = 'info') {
@@ -2471,9 +2519,17 @@ function isLogTab(tab) {
   return tab.startsWith('logs_');
 }
 
+function isStockTab(tab) {
+  return tab === 'ho' || tab === 'agen' || tab === 'return';
+}
+
+// Flag: hanya aktifkan filter periode di tab STOK jika user benar-benar mengubah tanggal filter
+let tableDateFilterTouched = false;
+
 function resetTableDateFilter() {
   document.getElementById('tableFilterStart').value = '';
   document.getElementById('tableFilterEnd').value = '';
+  tableDateFilterTouched = false;
   currentPage = 1;
   renderContent();
 }
@@ -3028,7 +3084,7 @@ function renderContent() {
   }
 
   if (dateFilterBox) {
-    if (isLogTab(activeTab)) {
+    if (isLogTab(activeTab) || isStockTab(activeTab)) {
       dateFilterBox.style.display = 'flex';
     } else {
       dateFilterBox.style.display = 'none';
@@ -3041,6 +3097,7 @@ function renderContent() {
 
   let rows = [];
   let cols = [];
+  let preTableHtml = '';
 
   if (activeDash === 'audit') {
     rows = data.audit || [];
@@ -3052,17 +3109,32 @@ function renderContent() {
     ];
   } else if (activeTab === 'ho' || activeTab === 'agen' || activeTab === 'return') {
     const key = activeTab;
-    rows = data[key] || [];
+    const fStartVal = document.getElementById('tableFilterStart')?.value || '';
+    const fEndVal = document.getElementById('tableFilterEnd')?.value || '';
+    const periodMode = tableDateFilterTouched && (fStartVal || fEndVal);
+
+    if (periodMode) {
+      rows = getStockRowsForPeriod(key, fStartVal, fEndVal);
+      const fmtID = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'}) : '…';
+      preTableHtml = `<div style="background: linear-gradient(90deg, rgba(139,92,246,0.18), rgba(139,92,246,0.05)); border:1px solid rgba(139,92,246,0.35); border-radius:12px; padding:10px 14px; margin-bottom:10px; font-size:12px; color:#c4b5fd; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span style="font-size:15px;">🗓️</span>
+        <b style="color:#e9d5ff;">MODE PERIODE:</b> Menampilkan stok periode <b style="color:#fff;">${fmtID(fStartVal)}</b> s/d <b style="color:#fff;">${fmtID(fEndVal)}</b>.
+        <span style="color:#a78bfa;">Awal Periode = stok awal + seluruh mutasi sebelum tanggal mulai · Total In/Out = transaksi di dalam periode · Akhir Periode = sisa stok pada akhir periode.</span>
+      </div>`;
+    } else {
+      rows = data[key] || [];
+    }
+
     cols = [
       {key: 'no', label: 'No', type: 'text'},
       {key: 'kode', label: 'Kode', type: 'mono'},
       {key: 'item', label: 'Item', type: 'text'},
       {key: 'satuan', label: 'Satuan', type: 'text'},
-      {key: 'awal', label: 'Awal', type: 'num'},
+      {key: 'awal', label: periodMode ? 'Awal Periode' : 'Awal', type: 'num'},
       {key: 'buffer', label: 'Buffer', type: 'num'},
       {key: 'totalIn', label: 'Total In', type: 'num_in'},
       {key: 'totalOut', label: 'Total Out', type: 'num_out'},
-      {key: 'akhir', label: 'Akhir', type: 'num'},
+      {key: 'akhir', label: periodMode ? 'Akhir Periode' : 'Akhir', type: 'num'},
       {key: 'status', label: 'Status', type: 'status'}
     ];
   } else if (activeTab === 'master_ho' || activeTab === 'master_agen' || activeTab === 'master_return') {
@@ -3156,7 +3228,7 @@ function renderContent() {
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedRows = rows.slice(startIndex, startIndex + rowsPerPage);
 
-  let html = '<div class="table-wrap"><div class="scroll"><table><thead><tr>';
+  let html = preTableHtml + '<div class="table-wrap"><div class="scroll"><table><thead><tr>';
   cols.forEach(c => {
     let thCls = c.type === 'num' || c.type === 'num_in' || c.type === 'num_out' || c.type === 'num_in_log' || c.type === 'num_out_log' ? 'text-right' : '';
     if (c.key === 'no') thCls += ' col-no';
@@ -5340,5 +5412,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1000);
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2cfd7cc2b6c8093',t:'MTc4NzA0NDgzMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a34961296fc36d44',t:'MTc4ODMxOTIzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
