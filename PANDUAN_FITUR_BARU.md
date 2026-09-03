@@ -64,3 +64,28 @@ Upload ke GitHub:
 - `PANDUAN_FITUR_BARU.md` (panduan)
 
 Tidak perlu mengubah file API untuk fitur frontend ini. Setelah Vercel selesai deploy, gunakan `Ctrl + Shift + R`.
+
+## 8. Filter Global Konsisten
+Panel **Filter Global** berada di atas seluruh dashboard dan tersimpan di browser.
+
+Pilihan filter:
+- Tanggal mulai dan selesai
+- Gudang HO/AGEN/RETURN
+- Status Kritis/Waspada/Aman
+- Gerai
+
+Filter diterapkan pada ringkasan eksekutif, KPI dan tabel gudang, log, grafik gudang/global, prediksi, rekomendasi PO, serta file download. Filter tanggal pada tabel/download khusus tetap menjadi prioritas apabila diisi langsung pada menu tersebut.
+
+## 9. Beranda Eksekutif sebagai Halaman Awal
+Aplikasi sekarang membuka **🏠 Beranda** terlebih dahulu. Beranda mengikuti Filter Global dan menampilkan total stok, kondisi risiko, aktivitas, IN/OUT hari ini, serta prediksi mendesak. Semua dashboard lama tetap tersedia.
+
+## 10. Tampilan HP
+Pada layar maksimal 900 px:
+- Sidebar berubah menjadi drawer dengan tombol hamburger `☰`.
+- Menu otomatis tertutup setelah dipilih dan dapat ditutup dengan overlay/Escape.
+- Filter Global otomatis diringkas dan bisa dibuka dengan tombol Tampilkan.
+- KPI menjadi 2 kolom, lalu 1 kolom pada layar kecil.
+- Form menjadi 1 kolom.
+- Tab dapat digeser.
+- Tabel dapat digeser dengan sentuhan tanpa scrollbar horizontal yang mengganggu.
+- Tombol, modal, pencarian, pagination, dan toast disesuaikan untuk layar HP.

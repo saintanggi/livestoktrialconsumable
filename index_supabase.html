@@ -343,9 +343,76 @@
   .modal-card .flex { justify-content: flex-end; margin-top: 16px; }
   
   .footer { text-align: center; padding: 16px; color: #a29dbd; font-size: 12px; border-top: 1px solid #23203f; margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+  /* ===== RESPONSIVE MOBILE + GLOBAL FILTER ===== */
+  .mobile-menu-btn { display:none; }
+  .mobile-sidebar-overlay { display:none; }
+  .global-filter-panel { background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.06)); border:1px solid #302852; border-radius:16px; padding:12px 14px; margin-bottom:16px; }
+  .global-filter-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
+  .global-filter-grid { display:grid; grid-template-columns:repeat(5,minmax(125px,1fr)) auto; gap:8px; align-items:end; }
+  .global-filter-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .global-filter-field label { font-size:9px; color:#a29dbd; font-weight:800; letter-spacing:.7px; text-transform:uppercase; }
+  .global-filter-field input,.global-filter-field select { width:100%; min-width:0; padding:8px 9px; border:1px solid #302852; border-radius:9px; background:#0c0a18; color:#e9e7f2; font:11px Inter,sans-serif; }
+  .global-filter-active { font-size:10px; color:#4ade80; display:none; }
+  @media(max-width:900px){
+    body { display:block !important; min-height:100vh; }
+    .sidebar { position:fixed !important; left:-290px !important; top:0; width:280px !important; height:100dvh !important; z-index:3000 !important; padding:14px !important; border-right:1px solid #39305d !important; transition:left .25s ease; box-shadow:18px 0 45px rgba(0,0,0,.55); }
+    body.mobile-menu-open .sidebar { left:0 !important; }
+    .mobile-sidebar-overlay { display:block; position:fixed; inset:0; z-index:2990; background:rgba(5,4,12,.72); backdrop-filter:blur(3px); opacity:0; pointer-events:none; transition:opacity .2s; }
+    body.mobile-menu-open .mobile-sidebar-overlay { opacity:1; pointer-events:auto; }
+    .main-content { margin-left:0 !important; width:100% !important; padding:10px !important; }
+    .topbar { position:sticky; top:0; z-index:2000; padding:10px 11px !important; margin-bottom:10px !important; border-radius:12px !important; }
+    .mobile-menu-btn { display:inline-flex; width:40px; height:40px; padding:0; flex:0 0 40px; font-size:19px; }
+    .topbar .search-box { width:100%; order:3; }
+    .topbar .search-box input { width:100%; min-width:0 !important; }
+    .wrap { width:100%; min-width:0; }
+    .panel { padding:14px !important; border-radius:14px !important; margin-bottom:12px !important; }
+    .global-filter-panel { padding:10px; border-radius:13px; }
+    .global-filter-head { align-items:flex-start; }
+    .global-filter-grid { grid-template-columns:1fr 1fr; }
+    .global-filter-grid .btn { width:100%; }
+    .kpi-row { grid-template-columns:1fr 1fr !important; gap:8px !important; margin-bottom:10px !important; }
+    .kpi { padding:12px !important; min-width:0; border-radius:12px !important; }
+    .kpi .value { font-size:20px !important; overflow-wrap:anywhere; }
+    .kpi .label { font-size:9px !important; }
+    .analytics-grid { grid-template-columns:1fr !important; gap:9px !important; }
+    .chart-card { border-radius:12px !important; padding:10px !important; }
+    .form-grid { grid-template-columns:1fr !important; }
+    .form-group { grid-column:1 !important; }
+    .tab-bar { gap:2px; margin-bottom:10px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .tab-bar::-webkit-scrollbar { display:none; }
+    .tab-btn { padding:10px 12px; font-size:12px; }
+    .table-toolbar { align-items:stretch; }
+    .table-toolbar > .flex { width:100%; }
+    .local-search-box,.local-search-input { width:100% !important; min-width:0 !important; }
+    .date-filter-box { width:100%; overflow-x:auto; padding-bottom:3px; justify-content:flex-start; }
+    .date-filter-box input { min-width:128px; }
+    .table-wrap { width:100%; overflow-x:auto !important; -webkit-overflow-scrolling:touch; border-radius:12px; scrollbar-width:none; }
+    .table-wrap::-webkit-scrollbar { display:none; }
+    .table-wrap table { min-width:760px; font-size:11px; }
+    th { padding:10px 8px !important; font-size:9px !important; }
+    td { padding:9px 8px !important; }
+    .scroll { max-height:62dvh !important; overflow:auto !important; }
+    .col-item { min-width:220px !important; }
+    .export-panel { padding:12px !important; }
+    .export-panel .btn { flex:1 1 135px; }
+    .pagination-bar { gap:5px; padding:7px; font-size:10px; }
+    .pagination-bar .btn { padding:7px 10px; }
+    .modal-card { width:94% !important; padding:16px !important; max-height:88dvh !important; }
+    .footer { font-size:10px; }
+    .toast { left:10px; right:10px; bottom:10px; max-width:none; text-align:center; }
+  }
+  @media(max-width:520px){
+    .global-filter-grid { grid-template-columns:1fr; }
+    .kpi-row { grid-template-columns:1fr !important; }
+    .topbar-title-long { display:none; }
+    .btn { min-height:40px; }
+  }
+
 </style>
 </head>
 <body>
+<div class="mobile-sidebar-overlay" onclick="toggleMobileMenu(false)"></div>
 
 <div class="toast" id="toast"></div>
 
@@ -363,8 +430,8 @@
       <small id="userStatus">🟢 LIVE STOK</small>
     </div>
     <div class="dash-buttons" id="dashButtons">
-      <button class="dash-btn" data-dash="home" style="background:#7c3aed18;color:#c4b5fd;border-color:#7c3aed55;">🏠 Beranda</button>
-      <button class="dash-btn active" data-dash="ho">🏢 HO</button>
+      <button class="dash-btn active" data-dash="home" style="background:#7c3aed18;color:#c4b5fd;border-color:#7c3aed55;">🏠 Beranda</button>
+      <button class="dash-btn" data-dash="ho">🏢 HO</button>
       <button class="dash-btn" data-dash="agen">🏪 AGEN</button>
       <button class="dash-btn" data-dash="return">📦 RETURN</button>
       <button class="dash-btn auth-btn" data-dash="po" style="display:none; color:#58a6ff; border-color:#58a6ff55;">📄 PO & Penerimaan</button>
@@ -425,7 +492,8 @@
 
   <div class="topbar">
     <div class="flex" style="gap: 10px; align-items: center;">
-      <span style="font-size: 13px; font-weight: bold; color: #f2a93b;">Control Room & Analytics</span>
+      <button class="btn mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Buka menu">☰</button>
+      <span class="topbar-title-long" style="font-size: 13px; font-weight: bold; color: #f2a93b;">Control Room & Analytics</span>
     </div>
     <div class="search-box">
       <input id="globalSearch" placeholder="Cari global..." autocomplete="off">
@@ -433,6 +501,24 @@
   </div>
 
   <div class="wrap">
+
+
+    <!-- FILTER GLOBAL KONSISTEN -->
+    <div class="global-filter-panel" id="globalFilterPanel">
+      <div class="global-filter-head">
+        <div><b style="font-size:12px;color:#ddd6fe;">🎛️ Filter Global</b> <span id="globalFilterActive" class="global-filter-active">● AKTIF</span><div style="font-size:9px;color:#77718f;margin-top:2px;">Berlaku pada ringkasan, tabel stok/log, prediksi, rekomendasi, dan hasil download.</div></div>
+        <button class="btn" style="padding:6px 9px;font-size:10px;" onclick="toggleGlobalFilter()" id="globalFilterToggle">Sembunyikan</button>
+      </div>
+      <div class="global-filter-grid" id="globalFilterGrid">
+        <div class="global-filter-field"><label>Tanggal Mulai</label><input type="date" id="globalFilterStart" onchange="applyGlobalFilters()"></div>
+        <div class="global-filter-field"><label>Tanggal Selesai</label><input type="date" id="globalFilterEnd" onchange="applyGlobalFilters()"></div>
+        <div class="global-filter-field"><label>Gudang</label><select id="globalFilterWarehouse" onchange="applyGlobalFilters()"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option></select></div>
+        <div class="global-filter-field"><label>Status Stok</label><select id="globalFilterStatus" onchange="applyGlobalFilters()"><option value="ALL">Semua Status</option><option value="crit">Kritis</option><option value="warn">Waspada</option><option value="ok">Aman</option></select></div>
+        <div class="global-filter-field"><label>Gerai</label><select id="globalFilterGerai" onchange="applyGlobalFilters()"><option value="ALL">Semua Gerai</option></select></div>
+        <button class="btn btn-danger" onclick="resetGlobalFilters()" style="padding:8px 11px;font-size:11px;">Reset Filter</button>
+      </div>
+    </div>
+
 
 
     <!-- BERANDA RINGKASAN EKSEKUTIF (FITUR TAMBAHAN, TIDAK MENGUBAH DASHBOARD GUDANG) -->
@@ -444,7 +530,7 @@
     <div class="panel hidden" id="panelForecast">
       <div style="background:linear-gradient(135deg,rgba(124,58,237,.20),rgba(6,182,212,.10));border:1px solid #7c3aed55;border-radius:16px;padding:20px;margin-bottom:14px;">
         <h3 style="margin:0 0 5px;">🔮 Prediksi Stok Habis</h3>
-        <p style="margin:0;color:#a29dbd;font-size:12px;">Estimasi berdasarkan rata-rata transaksi OUT selama 30 hari terakhir. Hasil prediksi bersifat rekomendasi dan tidak mengubah stok.</p>
+        <p style="margin:0;color:#a29dbd;font-size:12px;">Estimasi berdasarkan rata-rata transaksi OUT 30 hari terakhir atau periode Filter Global yang dipilih. Hasil prediksi bersifat rekomendasi dan tidak mengubah stok.</p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
         <select id="forecastWarehouse" onchange="renderForecastDashboard()" style="max-width:170px;"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option></select>
@@ -1469,8 +1555,8 @@ let data = {
   po_deliveries: []
 };
 
-let activeDash = 'ho';
-let activeTab = 'ho';
+let activeDash = 'home';
+let activeTab = 'home';
 let searchQuery = '';
 let warehouseHealthChartInstance = null;
 let warehouseOutflowChartInstance = null;
@@ -2303,7 +2389,7 @@ function updateUI() {
     authBtns.forEach(b => b.style.display = 'none');
     if (usersBtn) usersBtn.style.display = 'none';
     if (adminFooterActions) adminFooterActions.style.display = 'none';
-    if (['transfer','upload','opname','master','input','users','gerai','audit'].includes(activeDash)) {
+    if (['transfer','upload','opname','master','input','users','gerai','audit','backup'].includes(activeDash)) {
       activeDash = 'ho';
       activeTab = 'ho';
       document.querySelectorAll('.dash-btn').forEach(b => {
@@ -2476,6 +2562,31 @@ async function deleteGerai(nama) {
 }
 
 
+
+// ===== FILTER GLOBAL KONSISTEN + NAVIGASI MOBILE =====
+function getGlobalFilters(){
+  return {
+    start:document.getElementById('globalFilterStart')?.value||'',
+    end:document.getElementById('globalFilterEnd')?.value||'',
+    warehouse:document.getElementById('globalFilterWarehouse')?.value||'ALL',
+    status:document.getElementById('globalFilterStatus')?.value||'ALL',
+    gerai:document.getElementById('globalFilterGerai')?.value||'ALL'
+  };
+}
+function globalFilterIsActive(){const f=getGlobalFilters();return !!(f.start||f.end||f.warehouse!=='ALL'||f.status!=='ALL'||f.gerai!=='ALL');}
+function stockStatusForLog(log){const stat=getNormalizedStatus(log.status),arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;return arr.find(x=>x.kode===log.kode)?.status||'ok';}
+function logPassesGlobalFilter(log,ignoreDates=false){const f=getGlobalFilters(),d=formatYMD(log.tanggal),wh=getNormalizedStatus(log.status);if(!ignoreDates&&f.start&&d<f.start)return false;if(!ignoreDates&&f.end&&d>f.end)return false;if(f.warehouse!=='ALL'&&wh!==f.warehouse)return false;if(f.gerai!=='ALL'&&String(log.gerai||'')!==f.gerai)return false;if(f.status!=='ALL'&&stockStatusForLog(log)!==f.status)return false;return true;}
+function applyGlobalStockFilter(rows,gudang){const f=getGlobalFilters();let out=rows;if(f.warehouse!=='ALL'&&gudang&&f.warehouse!==gudang)return [];if(f.status!=='ALL')out=out.filter(r=>(r.status||statusBadge(r.buffer,r.akhir))===f.status);if(f.gerai!=='ALL'){const codes=new Set((data.logs||[]).filter(l=>logPassesGlobalFilter(l)).map(l=>l.kode));out=out.filter(r=>codes.has(r.kode));}return out;}
+function populateGlobalGerai(){const sel=document.getElementById('globalFilterGerai');if(!sel)return;const old=sel.value;sel.innerHTML='<option value="ALL">Semua Gerai</option>'+[...new Set(data.gerai||[])].map(g=>`<option value="${String(g).replace(/"/g,'&quot;')}">${g}</option>`).join('');if([...sel.options].some(o=>o.value===old))sel.value=old;}
+function saveGlobalFilterState(){try{localStorage.setItem('livestock_global_filter',JSON.stringify(getGlobalFilters()));}catch(e){}}
+function loadGlobalFilterState(){try{const f=JSON.parse(localStorage.getItem('livestock_global_filter')||'{}');[['globalFilterStart',f.start],['globalFilterEnd',f.end],['globalFilterWarehouse',f.warehouse],['globalFilterStatus',f.status],['globalFilterGerai',f.gerai]].forEach(([id,v])=>{const el=document.getElementById(id);if(el&&v!=null)el.value=v;});}catch(e){}updateGlobalFilterIndicator();}
+function updateGlobalFilterIndicator(){const el=document.getElementById('globalFilterActive');if(el)el.style.display=globalFilterIsActive()?'inline':'none';}
+function applyGlobalFilters(){const f=getGlobalFilters();if(f.start&&f.end&&f.start>f.end){showToast('Tanggal mulai filter global tidak boleh melebihi tanggal selesai!','error');return;}saveGlobalFilterState();updateGlobalFilterIndicator();currentPage=1;if(activeDash==='home')renderExecutiveDashboard();else if(activeDash==='forecast')renderForecastDashboard();else if(activeDash==='po_recommendation')renderPoRecommendation();else refreshAll();}
+function resetGlobalFilters(){['globalFilterStart','globalFilterEnd'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['globalFilterWarehouse','globalFilterStatus','globalFilterGerai'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='ALL';});applyGlobalFilters();showToast('Filter global dikembalikan ke Semua Data.','success');}
+function toggleGlobalFilter(){const grid=document.getElementById('globalFilterGrid'),btn=document.getElementById('globalFilterToggle');if(!grid)return;const hidden=grid.style.display==='none';grid.style.display=hidden?'grid':'none';if(btn)btn.textContent=hidden?'Sembunyikan':'Tampilkan';}
+function toggleMobileMenu(force){const open=typeof force==='boolean'?force:!document.body.classList.contains('mobile-menu-open');document.body.classList.toggle('mobile-menu-open',open);}
+
+
 // ===== FITUR ANALITIK TAMBAHAN: PREDIKSI 30 HARI, BERANDA, PO, BACKUP =====
 const FORECAST_WINDOW_DAYS = 30;
 const PO_TARGET_DAYS = 30;
@@ -2492,20 +2603,24 @@ function getAllStockRows() {
 function getForecastRows() {
   const today = new Date();
   today.setHours(0,0,0,0);
-  const start = new Date(today);
-  start.setDate(start.getDate() - (FORECAST_WINDOW_DAYS - 1));
+  const gf = getGlobalFilters();
+  let rangeEnd = gf.end ? new Date(gf.end + 'T00:00:00') : new Date(today);
+  let rangeStart;
+  if (gf.start) rangeStart = new Date(gf.start + 'T00:00:00');
+  else { rangeStart = new Date(rangeEnd); rangeStart.setDate(rangeStart.getDate() - (FORECAST_WINDOW_DAYS - 1)); }
+  const analysisDays = Math.max(1, Math.round((rangeEnd - rangeStart) / 86400000) + 1);
   const outMap = {};
   (data.logs || []).forEach(log => {
     const dText = formatYMD(log.tanggal);
     const d = new Date(dText + 'T00:00:00');
-    if (isNaN(d.getTime()) || d < start || d > today) return;
+    if (isNaN(d.getTime()) || d < rangeStart || d > rangeEnd || !logPassesGlobalFilter(log, true)) return;
     const key = getNormalizedStatus(log.status) + '|' + log.kode;
     outMap[key] = (outMap[key] || 0) + num(log.out);
   });
 
   return getAllStockRows().map(item => {
     const totalOut30 = outMap[item.gudang + '|' + item.kode] || 0;
-    const avgOut = totalOut30 / FORECAST_WINDOW_DAYS;
+    const avgOut = totalOut30 / analysisDays;
     const stock = num(item.akhir);
     let daysToEmpty = null;
     if (avgOut > 0) daysToEmpty = stock <= 0 ? 0 : Math.ceil(stock / avgOut);
@@ -2516,7 +2631,7 @@ function getForecastRows() {
     }
     const recommendation = Math.max(0, Math.ceil((avgOut * PO_TARGET_DAYS) + num(item.buffer) - Math.max(0, stock)));
     const risk = daysToEmpty === null ? 'NO_USAGE' : daysToEmpty <= 7 ? 'URGENT' : daysToEmpty <= 30 ? 'SOON' : 'SAFE';
-    return Object.assign({}, item, { stock, totalOut30, avgOut, daysToEmpty, estimatedDate, recommendation, forecastRisk:risk });
+    return Object.assign({}, item, { stock, totalOut30, avgOut, analysisDays, daysToEmpty, estimatedDate, recommendation, forecastRisk:risk });
   });
 }
 
@@ -2529,14 +2644,14 @@ function forecastBadge(row) {
 
 function renderExecutiveDashboard() {
   const el = document.getElementById('executiveDashboardContent'); if (!el) return;
-  const rows = getAllStockRows(), forecasts = getForecastRows();
+  const gf=getGlobalFilters(); let rows=[]; [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,gudang])=>{const source=(gf.start||gf.end)?getStockRowsForPeriod(key,gf.start,gf.end):(data[key]||[]);source.forEach(r=>rows.push(Object.assign({},r,{gudang})));}); rows=applyGlobalStockFilter(rows,null).filter(r=>gf.warehouse==='ALL'||r.gudang===gf.warehouse); const forecasts=getForecastRows().filter(r=>(gf.warehouse==='ALL'||r.gudang===gf.warehouse)&&(gf.status==='ALL'||r.status===gf.status));
   const totalStock = rows.reduce((s,r)=>s+num(r.akhir),0);
   const crit = rows.filter(r=>r.status==='crit').length, warn = rows.filter(r=>r.status==='warn').length;
   const today = new Date().toISOString().split('T')[0];
-  const todayLogs = (data.logs||[]).filter(l=>formatYMD(l.tanggal)===today);
+  const todayLogs = (data.logs||[]).filter(l=>formatYMD(l.tanggal)===today&&logPassesGlobalFilter(l,true));
   const inToday=todayLogs.reduce((s,l)=>s+num(l.in),0), outToday=todayLogs.reduce((s,l)=>s+num(l.out),0);
   const urgent = forecasts.filter(r=>r.daysToEmpty!==null && r.daysToEmpty<=7).sort((a,b)=>a.daysToEmpty-b.daysToEmpty).slice(0,8);
-  const recent=(data.logs||[]).slice().sort((a,b)=>String(b.tanggal).localeCompare(String(a.tanggal))).slice(0,6);
+  const recent=(data.logs||[]).filter(l=>logPassesGlobalFilter(l)).slice().sort((a,b)=>String(b.tanggal).localeCompare(String(a.tanggal))).slice(0,6);
   el.innerHTML=`
     <div style="background:linear-gradient(135deg,#21163f,#101827);border:1px solid #7c3aed55;border-radius:16px;padding:20px;margin-bottom:14px;"><h3 style="margin:0 0 5px;">🏠 Ringkasan Eksekutif</h3><p style="margin:0;color:#a29dbd;font-size:12px;">Kondisi seluruh gudang dalam satu tampilan. Data hanya dibaca, tidak mengubah transaksi.</p></div>
     <div class="kpi-row" style="display:grid;margin-bottom:14px;">
@@ -2553,25 +2668,25 @@ function renderExecutiveDashboard() {
 function renderForecastDashboard() {
   const warehouse=document.getElementById('forecastWarehouse')?.value||'ALL';
   const risk=document.getElementById('forecastRisk')?.value||'ALL';
-  let rows=getForecastRows().filter(r=>(warehouse==='ALL'||r.gudang===warehouse)&&(risk==='ALL'||r.forecastRisk===risk));
+  const gf=getGlobalFilters(); let rows=getForecastRows().filter(r=>(warehouse==='ALL'||r.gudang===warehouse)&&(risk==='ALL'||r.forecastRisk===risk)&&(gf.warehouse==='ALL'||r.gudang===gf.warehouse)&&(gf.status==='ALL'||r.status===gf.status));
   rows.sort((a,b)=>(a.daysToEmpty??999999)-(b.daysToEmpty??999999));
   const urgent=rows.filter(r=>r.daysToEmpty!==null&&r.daysToEmpty<=7).length, soon=rows.filter(r=>r.daysToEmpty>7&&r.daysToEmpty<=30).length;
-  document.getElementById('forecastSummary').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><span class="badge crit">≤ 7 hari: ${urgent}</span><span class="badge warn">8–30 hari: ${soon}</span><span class="badge ok">Total: ${rows.length}</span></div>`;
-  document.getElementById('forecastTable').innerHTML=`<div class="table-wrap"><div class="scroll"><table><thead><tr><th>Gudang</th><th>Kode</th><th>Nama Barang</th><th>Satuan</th><th class="text-right">Stok Akhir</th><th class="text-right">OUT 30 Hari</th><th class="text-right">Rata-rata OUT/Hari</th><th>Estimasi Habis</th><th>Perkiraan Tanggal</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="badge ok">${r.gudang}</span></td><td class="text-muted">${r.kode}</td><td>${r.item}</td><td>${r.satuan}</td><td class="text-right">${fmt(r.stock)}</td><td class="text-right">${fmt(r.totalOut30)}</td><td class="text-right">${r.avgOut.toLocaleString('id-ID',{maximumFractionDigits:2})}</td><td>${forecastBadge(r)}</td><td>${r.estimatedDate?formatDateSimple(r.estimatedDate):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+  document.getElementById('forecastSummary').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><span class="badge crit">≤ 7 hari: ${urgent}</span><span class="badge warn">8–30 hari: ${soon}</span><span class="badge ok">Total: ${rows.length}</span><span class="badge ok">Periode analisis: ${rows[0]?.analysisDays||FORECAST_WINDOW_DAYS} hari</span></div>`;
+  document.getElementById('forecastTable').innerHTML=`<div class="table-wrap"><div class="scroll"><table><thead><tr><th>Gudang</th><th>Kode</th><th>Nama Barang</th><th>Satuan</th><th class="text-right">Stok Akhir</th><th class="text-right">OUT Periode</th><th class="text-right">Rata-rata OUT/Hari</th><th>Estimasi Habis</th><th>Perkiraan Tanggal</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="badge ok">${r.gudang}</span></td><td class="text-muted">${r.kode}</td><td>${r.item}</td><td>${r.satuan}</td><td class="text-right">${fmt(r.stock)}</td><td class="text-right">${fmt(r.totalOut30)}</td><td class="text-right">${r.avgOut.toLocaleString('id-ID',{maximumFractionDigits:2})}</td><td>${forecastBadge(r)}</td><td>${r.estimatedDate?formatDateSimple(r.estimatedDate):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 
-function forecastExportRows(rows) { return rows.map((r,i)=>({'NO':i+1,'GUDANG':r.gudang,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AKHIR':r.stock,'TOTAL OUT 30 HARI':r.totalOut30,'RATA-RATA OUT/HARI':Number(r.avgOut.toFixed(2)),'ESTIMASI HARI HABIS':r.daysToEmpty===null?'TIDAK ADA OUT':r.daysToEmpty,'PERKIRAAN TANGGAL HABIS':r.estimatedDate||'-','REKOMENDASI PO 30 HARI':r.recommendation})); }
+function forecastExportRows(rows) { return rows.map((r,i)=>({'NO':i+1,'GUDANG':r.gudang,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AKHIR':r.stock,'TOTAL OUT PERIODE':r.totalOut30,'JUMLAH HARI ANALISIS':r.analysisDays,'RATA-RATA OUT/HARI':Number(r.avgOut.toFixed(2)),'ESTIMASI HARI HABIS':r.daysToEmpty===null?'TIDAK ADA OUT':r.daysToEmpty,'PERKIRAAN TANGGAL HABIS':r.estimatedDate||'-','REKOMENDASI PO 30 HARI':r.recommendation})); }
 function exportForecastExcel(){ if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;} const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(forecastExportRows(getForecastRows())),'Prediksi_Stok');XLSX.writeFile(wb,`Prediksi_Stok_30_Hari_${new Date().toISOString().split('T')[0]}.xlsx`); }
 
-function renderPoRecommendation(){ const wh=document.getElementById('poRecWarehouse')?.value||'ALL';const rows=getForecastRows().filter(r=>r.recommendation>0&&(wh==='ALL'||r.gudang===wh)).sort((a,b)=>b.recommendation-a.recommendation);document.getElementById('poRecommendationContent').innerHTML=`<div style="margin-bottom:10px;"><span class="badge warn">${rows.length} barang direkomendasikan</span></div><div class="table-wrap"><div class="scroll"><table><thead><tr><th>Gudang</th><th>Kode</th><th>Nama Barang</th><th class="text-right">Stok</th><th class="text-right">Buffer</th><th class="text-right">Avg OUT/Hari</th><th class="text-right">Kebutuhan 30 Hari</th><th class="text-right">Rekomendasi QTY PO</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${r.gudang}</td><td class="text-muted">${r.kode}</td><td>${r.item}</td><td class="text-right">${fmt(r.stock)}</td><td class="text-right">${fmt(r.buffer)}</td><td class="text-right">${r.avgOut.toLocaleString('id-ID',{maximumFractionDigits:2})}</td><td class="text-right">${fmt(Math.ceil(r.avgOut*PO_TARGET_DAYS))}</td><td class="text-right" style="color:#fbbf24;font-weight:800;">${fmt(r.recommendation)}</td></tr>`).join(''):'<tr><td colspan="8" class="text-center text-muted">Belum ada barang yang membutuhkan rekomendasi PO</td></tr>'}</tbody></table></div></div>`; }
+function renderPoRecommendation(){ const wh=document.getElementById('poRecWarehouse')?.value||'ALL';const gf=getGlobalFilters();const rows=getForecastRows().filter(r=>r.recommendation>0&&(wh==='ALL'||r.gudang===wh)&&(gf.warehouse==='ALL'||r.gudang===gf.warehouse)&&(gf.status==='ALL'||r.status===gf.status)).sort((a,b)=>b.recommendation-a.recommendation);document.getElementById('poRecommendationContent').innerHTML=`<div style="margin-bottom:10px;"><span class="badge warn">${rows.length} barang direkomendasikan</span></div><div class="table-wrap"><div class="scroll"><table><thead><tr><th>Gudang</th><th>Kode</th><th>Nama Barang</th><th class="text-right">Stok</th><th class="text-right">Buffer</th><th class="text-right">Avg OUT/Hari</th><th class="text-right">Kebutuhan 30 Hari</th><th class="text-right">Rekomendasi QTY PO</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${r.gudang}</td><td class="text-muted">${r.kode}</td><td>${r.item}</td><td class="text-right">${fmt(r.stock)}</td><td class="text-right">${fmt(r.buffer)}</td><td class="text-right">${r.avgOut.toLocaleString('id-ID',{maximumFractionDigits:2})}</td><td class="text-right">${fmt(Math.ceil(r.avgOut*PO_TARGET_DAYS))}</td><td class="text-right" style="color:#fbbf24;font-weight:800;">${fmt(r.recommendation)}</td></tr>`).join(''):'<tr><td colspan="8" class="text-center text-muted">Belum ada barang yang membutuhkan rekomendasi PO</td></tr>'}</tbody></table></div></div>`; }
 function exportPoRecommendation(){if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}const rows=getForecastRows().filter(r=>r.recommendation>0);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(forecastExportRows(rows)),'Rekomendasi_PO');XLSX.writeFile(wb,`Rekomendasi_PO_30_Hari_${new Date().toISOString().split('T')[0]}.xlsx`);}
 
 function exportAllStockWorkbook(){
   if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
-  const start=document.getElementById('stockExportStart')?.value||'', end=document.getElementById('stockExportEnd')?.value||'';
+  const gf=getGlobalFilters(), start=document.getElementById('stockExportStart')?.value||gf.start, end=document.getElementById('stockExportEnd')?.value||gf.end;
   if(start&&end&&start>end){showToast('Tanggal mulai tidak boleh melebihi tanggal selesai!','error');return;}
   const wb=XLSX.utils.book_new();
-  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,label])=>{const rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
+  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,label])=>{let rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);rows=applyGlobalStockFilter(rows,label);const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
   XLSX.writeFile(wb,`Rekap_Semua_Stok_${start||'awal'}_sd_${end||'berjalan'}.xlsx`);showToast('✅ Semua stok berhasil didownload dalam 3 sheet!','success');
 }
 
@@ -2652,7 +2767,9 @@ function showPanel(dash) {
 
 function renderKPIs() {
   const targetKey = activeDash === 'ho' ? 'ho' : activeDash === 'agen' ? 'agen' : 'return';
-  const items = data[targetKey] || [];
+  const gf = getGlobalFilters();
+  let items = (gf.start || gf.end) ? getStockRowsForPeriod(targetKey, gf.start, gf.end) : (data[targetKey] || []);
+  items = applyGlobalStockFilter(items, targetKey.toUpperCase());
   const crit = items.filter(i => i.status === 'crit').length;
   const total = items.length;
   const totalStok = items.reduce((s, i) => s + num(i.akhir), 0);
@@ -3097,6 +3214,8 @@ function renderGlobalGrafikDashboard() {
   const atRiskMaster = (data.master || []).filter(m => {
     let targetKey = 'ho';
     const stat = getNormalizedStatus(m.status);
+    const gf = getGlobalFilters();
+    if (gf.warehouse !== 'ALL' && stat !== gf.warehouse) return false;
     if (stat === 'AGEN') targetKey = 'agen';
     else if (stat === 'RETURN') targetKey = 'return';
     
@@ -3110,9 +3229,11 @@ function renderGlobalGrafikDashboard() {
   const atRiskCodes = new Set(atRiskMaster.map(m => m.kode));
 
   // Hitung total stok khusus untuk barang kritis/waspada
-  const totalHoStock = (data.ho || []).filter(i => i.status === 'crit' || i.status === 'warn').reduce((acc, item) => acc + num(item.akhir), 0);
-  const totalAgenStock = (data.agen || []).filter(i => i.status === 'crit' || i.status === 'warn').reduce((acc, item) => acc + num(item.akhir), 0);
-  const totalReturnStock = (data.return || []).filter(i => i.status === 'crit' || i.status === 'warn').reduce((acc, item) => acc + num(item.akhir), 0);
+  const gfChart = getGlobalFilters();
+  const chartRows = (key, label) => applyGlobalStockFilter((gfChart.start || gfChart.end) ? getStockRowsForPeriod(key, gfChart.start, gfChart.end) : (data[key] || []), label).filter(i => i.status === 'crit' || i.status === 'warn');
+  const totalHoStock = chartRows('ho','HO').reduce((acc, item) => acc + num(item.akhir), 0);
+  const totalAgenStock = chartRows('agen','AGEN').reduce((acc, item) => acc + num(item.akhir), 0);
+  const totalReturnStock = chartRows('return','RETURN').reduce((acc, item) => acc + num(item.akhir), 0);
 
   setTimeout(() => {
     if (typeof Chart === 'undefined') {
@@ -3156,7 +3277,7 @@ function renderGlobalGrafikDashboard() {
     // 2. CHART 2: Tren Transaksi Harian (Hanya Kritis/Waspada)
     let dailyMap = {};
     (data.logs || []).forEach(l => {
-      if (!atRiskCodes.has(l.kode)) return; // Hanya tampilkan pergerakan barang berstatus kritis/waspada!
+      if (!atRiskCodes.has(l.kode) || !logPassesGlobalFilter(l)) return; // Mengikuti filter global barang berstatus kritis/waspada!
       let dStr = formatYMD(l.tanggal);
       if (!dailyMap[dStr]) dailyMap[dStr] = { in: 0, out: 0 };
       dailyMap[dStr].in += num(l.in);
@@ -3211,7 +3332,7 @@ function renderGlobalGrafikDashboard() {
     // 3. CHART 3: Top 10 Produk Kritis/Waspada (Pergerakan Terbanyak)
     let productMovementMap = {};
     (data.logs || []).forEach(l => {
-      if (!atRiskCodes.has(l.kode)) return; // Hanya hitung pergerakan barang berstatus kritis/waspada!
+      if (!atRiskCodes.has(l.kode) || !logPassesGlobalFilter(l)) return; // Mengikuti filter global barang berstatus kritis/waspada!
       let pName = l.item || l.kode || 'Unknown';
       let totalQty = num(l.in) + num(l.out);
       productMovementMap[pName] = (productMovementMap[pName] || 0) + totalQty;
@@ -3257,7 +3378,8 @@ function renderGlobalGrafikDashboard() {
     
     const riskItems = [];
     ['ho', 'agen', 'return'].forEach(key => {
-      (data[key] || []).forEach(item => {
+      const label = key === 'return' ? 'RETURN' : key.toUpperCase();
+      chartRows(key, label).forEach(item => {
         if (item.status === 'crit' || item.status === 'warn') {
           riskItems.push({
             kode: item.kode,
@@ -3348,9 +3470,10 @@ function renderContent() {
     ];
   } else if (activeTab === 'ho' || activeTab === 'agen' || activeTab === 'return') {
     const key = activeTab;
-    const fStartVal = document.getElementById('tableFilterStart')?.value || '';
-    const fEndVal = document.getElementById('tableFilterEnd')?.value || '';
-    const periodMode = tableDateFilterTouched && (fStartVal || fEndVal);
+    const gf = getGlobalFilters();
+    const fStartVal = tableDateFilterTouched ? (document.getElementById('tableFilterStart')?.value || '') : gf.start;
+    const fEndVal = tableDateFilterTouched ? (document.getElementById('tableFilterEnd')?.value || '') : gf.end;
+    const periodMode = !!(fStartVal || fEndVal);
 
     if (periodMode) {
       rows = getStockRowsForPeriod(key, fStartVal, fEndVal);
@@ -3363,6 +3486,8 @@ function renderContent() {
     } else {
       rows = data[key] || [];
     }
+
+    rows = applyGlobalStockFilter(rows, key.toUpperCase());
 
     cols = [
       {key: 'no', label: 'No', type: 'text'},
@@ -3436,6 +3561,8 @@ function renderContent() {
       });
     }
   }
+
+  if (isLogTab(activeTab)) rows = rows.filter(r => logPassesGlobalFilter(r));
 
   const localSearch = (document.getElementById('localTableSearch')?.value || '').toLowerCase();
   if (localSearch) {
@@ -3595,6 +3722,8 @@ function exportLogByWarehouse(warehouse) {
     return true;
   });
 
+  filteredLogs = filteredLogs.filter(l => logPassesGlobalFilter(l, true));
+
   if (filteredLogs.length === 0) {
     showToast(`Tidak ada data log untuk kategori ${warehouse} pada rentang tanggal tersebut!`, 'error');
     return;
@@ -3631,8 +3760,9 @@ function exportLogByWarehouse(warehouse) {
 function exportStokByWarehouse(key) {
   const label = key.toUpperCase();
   // Filter periode khusus dari Dashboard Download (kosong = total berjalan)
-  const fStartVal = document.getElementById('stockExportStart')?.value || '';
-  const fEndVal = document.getElementById('stockExportEnd')?.value || '';
+  const gf = getGlobalFilters();
+  const fStartVal = document.getElementById('stockExportStart')?.value || gf.start;
+  const fEndVal = document.getElementById('stockExportEnd')?.value || gf.end;
   const periodMode = !!(fStartVal || fEndVal);
 
   if (fStartVal && fEndVal && fStartVal > fEndVal) {
@@ -3640,7 +3770,8 @@ function exportStokByWarehouse(key) {
     return;
   }
 
-  const rows = periodMode ? getStockRowsForPeriod(key, fStartVal, fEndVal) : (data[key] || []);
+  let rows = periodMode ? getStockRowsForPeriod(key, fStartVal, fEndVal) : (data[key] || []);
+  rows = applyGlobalStockFilter(rows, label);
 
   if (!rows.length) {
     showToast(`Tidak ada data stok ${label} untuk didownload!`, 'error');
@@ -3685,7 +3816,9 @@ function exportStokByWarehouse(key) {
 
 function renderWarehouseCharts(warehouseKey) {
   let amanCount = 0, waspadaCount = 0, kritisCount = 0;
-  const items = data[warehouseKey] || [];
+  const gf = getGlobalFilters();
+  let items = (gf.start || gf.end) ? getStockRowsForPeriod(warehouseKey, gf.start, gf.end) : (data[warehouseKey] || []);
+  items = applyGlobalStockFilter(items, warehouseKey.toUpperCase());
   
   items.forEach(item => {
     const b = num(item.buffer);
@@ -3697,6 +3830,7 @@ function renderWarehouseCharts(warehouseKey) {
 
   let outflowMap = {};
   data.logs.forEach(l => {
+    if (!logPassesGlobalFilter(l)) return;
     const lStat = getNormalizedStatus(l.status);
     if (lStat === warehouseKey.toUpperCase() || (warehouseKey === 'ho' && lStat === 'HO')) {
       const outVal = num(l.out);
@@ -5599,22 +5733,34 @@ function refreshAll() {
   renderKPIs();
   renderTabs();
   renderChartsContainer();
-  if (activeDash === 'grafik') {
-    renderGlobalGrafikDashboard();
-  }
+  if (activeDash === 'grafik') renderGlobalGrafikDashboard();
+  if (activeDash === 'home') renderExecutiveDashboard();
+  if (activeDash === 'forecast') renderForecastDashboard();
+  if (activeDash === 'po_recommendation') renderPoRecommendation();
   renderContent();
   populateDropdowns();
+  populateGlobalGerai();
   showPanel(activeDash);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
   initData();
   recalculateStok();
+  populateGlobalGerai();
+  loadGlobalFilterState();
+  if (window.innerWidth <= 900) {
+    const gfGrid = document.getElementById('globalFilterGrid');
+    const gfToggle = document.getElementById('globalFilterToggle');
+    if (gfGrid) gfGrid.style.display = 'none';
+    if (gfToggle) gfToggle.textContent = 'Tampilkan';
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleMobileMenu(false); });
   setStatus('online', 'ONLINE');
 
   document.querySelectorAll('.dash-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const dash = this.dataset.dash;
+      toggleMobileMenu(false);
       if (!isLoggedIn() && ['transfer','upload','opname','master','input','users','gerai','audit','backup'].includes(dash)) {
         showToast('Silakan login terlebih dahulu!', 'error');
         showLogin();
