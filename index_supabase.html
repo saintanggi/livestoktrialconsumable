@@ -445,6 +445,7 @@
       <button class="dash-btn auth-btn" data-dash="opname" style="display:none;">📊 Opname</button>
       <button class="dash-btn auth-btn" data-dash="master" style="display:none;">⚙️ Master</button>
       <button class="dash-btn auth-btn" data-dash="backup" style="display:none;color:#4ade80;border-color:#22c55e55;">🛡️ Backup & Pemulihan</button>
+      <button class="dash-btn auth-btn" data-dash="system_status" style="display:none;color:#67e8f9;border-color:#06b6d455;">🩺 Status Sistem</button>
       <button class="dash-btn auth-btn" data-dash="gerai" style="display:none; color:#3fb950; border-color:#3fb95055;" data-dash-target="gerai">🏪 Gerai</button>
       <button class="dash-btn auth-btn" data-dash="audit" style="display:none; color:#ba75ff; border-color:#ba75ff55;" data-dash-target="audit">🔍 Audit Log</button>
       <button class="dash-btn auth-btn" data-dash="input" style="display:none;">➕ Transaksi manual <span class="shortcut-hint">Ctrl+I</span></button>
@@ -520,6 +521,21 @@
     </div>
 
 
+
+
+    <!-- STATUS SISTEM & PENGUJIAN NON-DESTRUKTIF -->
+    <div class="panel hidden" id="panelSystemStatus">
+      <div style="background:linear-gradient(135deg,rgba(6,182,212,.16),rgba(124,58,237,.12));border:1px solid #06b6d455;border-radius:16px;padding:20px;margin-bottom:14px;">
+        <h3 style="margin:0 0 5px;color:#67e8f9;">🩺 Status Sistem & Pengujian</h3>
+        <p style="margin:0;color:#a29dbd;font-size:12px;">Pemeriksaan koneksi, integritas data, antrean offline, email, cron, dan status Supabase Auth. Semua pengujian bersifat baca-saja.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <button class="btn btn-primary" id="runDiagnosticsBtn" onclick="runSystemDiagnostics()">▶ Jalankan Pemeriksaan</button>
+        <button class="btn btn-success" onclick="downloadDiagnosticsReport()">📥 Download Laporan</button>
+        <span id="diagnosticLastRun" style="font-size:10px;color:#8b86a7;align-self:center;">Belum diperiksa</span>
+      </div>
+      <div id="systemDiagnosticsContent"><div style="padding:20px;text-align:center;color:#8b86a7;">Klik “Jalankan Pemeriksaan” untuk memulai.</div></div>
+    </div>
 
     <!-- BERANDA RINGKASAN EKSEKUTIF (FITUR TAMBAHAN, TIDAK MENGUBAH DASHBOARD GUDANG) -->
     <div class="panel hidden" id="panelHome">
@@ -1051,7 +1067,8 @@
 <div class="modal" id="loginModal">
   <div class="modal-card">
     <h3>🔐 Login</h3>
-    <div class="form-group"><label>Username</label><input type="text" id="loginUser" placeholder="admin" autocomplete="off"></div>
+    <div style="font-size:10px;color:#a29dbd;margin-bottom:10px;padding:8px;border:1px solid #302852;border-radius:8px;">Gunakan <b>email Supabase</b> untuk login baru, atau username lama selama masa transisi.</div>
+    <div class="form-group"><label>Email Supabase / Username Lama</label><input type="text" id="loginUser" placeholder="admin@gudang.com atau admin" autocomplete="username"></div>
     <div class="form-group"><label>Password</label><input type="text" id="loginPass" class="masked-password-input" placeholder="••••••••" autocomplete="off"></div>
     <div class="flex">
       <button class="btn" onclick="hideLogin()">Batal</button>
@@ -1257,11 +1274,14 @@ const supabaseRest = {
             }
           }
 
+          const authToken = await getValidSupabaseAccessToken();
           const response = await fetch(url, {
             method: method,
             headers: {
               'Content-Type': 'application/json',
-              'Prefer': preferUpsert ? 'resolution=merge-duplicates' : (method === 'POST' ? 'return=representation' : '')
+              'Prefer': preferUpsert ? 'resolution=merge-duplicates' : (method === 'POST' ? 'return=representation' : ''),
+              ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+              ...(!isVercel ? { 'apikey': apikey } : {})
             },
             body: bodyData ? JSON.stringify(bodyData) : null
           });
@@ -2109,7 +2129,8 @@ async function pullData() {
     const { data: dbMaster, error: masterErr } = await supabaseClient
       .from('master_barang')
       .select('*')
-      .order('kode', { ascending: true });
+      .order('kode', { ascending: true })
+      .limit(20000); // Pastikan seluruh master dimuat, bukan hanya batas default REST
     if (masterErr) throw masterErr;
 
     // 2. Tarik Data Log Transaksi dari Supabase (Ditambahkan limit tinggi & pengurutan terbaru agar data tidak hilang/terpotong!)
@@ -2198,8 +2219,8 @@ async function pullData() {
       data.gerai = dbGerai.map(g => g.nama);
     }
 
-    // 6. Tarik Setelan Email dari Supabase untuk menyelaraskan lokal browser secara otomatis
-    try {
+    // 6. Setelan SMTP bersifat sensitif: hanya dibaca pada sesi Admin.
+    if (isAdmin()) try {
       const { data: dbEmailSettings, error: emailSettingsErr } = await supabaseClient
         .from('email_settings')
         .select('*')
@@ -2267,6 +2288,7 @@ async function pullData() {
     saveData();
     refreshAll();
     setStatus('online', 'ONLINE');
+    localStorage.setItem('livestock_last_sync', new Date().toISOString());
     showToast('✅ Data & Log berhasil diambil dari Supabase!', 'success');
 
     if (btn) {
@@ -2310,11 +2332,24 @@ function hideLogin() { document.getElementById('loginModal').classList.remove('a
 async function doLogin() {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value.trim();
+  if (u.includes('@')) {
+    try {
+      showToast('⏳ Memverifikasi akun Supabase...', 'info');
+      await loginWithSupabase(u, p);
+      hideLogin(); updateUI(); await pullData();
+      showToast('✅ Login Supabase berhasil sebagai ' + currentUser.role, 'success');
+    } catch (err) {
+      recordSystemError(err.message, 'supabase-auth');
+      showToast('❌ Login Supabase gagal: ' + err.message, 'error');
+    }
+    return;
+  }
   const found = users.find(x => x.username === u);
   if (found) {
     // 1. Uji kecocokan langsung teks polos (Failsafe Terkuat)
     if (found.pass === p) {
-      currentUser = found;
+      saveAuthSession(null);
+      currentUser = Object.assign({}, found, { auth_type: 'legacy' });
       sessionStorage.setItem('stock_user', JSON.stringify(currentUser));
       hideLogin();
       updateUI();
@@ -2331,7 +2366,8 @@ async function doLogin() {
       if (userPassHash.length < 64) userPassHash = await hashPassword(userPassHash);
 
       if (inputHash === userPassHash || found.pass === p || userPassHash === "plain_" + p) {
-        currentUser = found;
+        saveAuthSession(null);
+        currentUser = Object.assign({}, found, { auth_type: 'legacy' });
         sessionStorage.setItem('stock_user', JSON.stringify(currentUser));
         hideLogin();
         updateUI();
@@ -2347,7 +2383,11 @@ async function doLogin() {
     showToast('❌ Username atau password salah!', 'error');
   }
 }
-function logout() {
+async function logout() {
+  const authSession = readAuthSession();
+  if (authSession?.access_token) { try { await authApi({action:'logout'}, authSession.access_token); } catch(e) {} }
+  saveAuthSession(null);
+  localStorage.removeItem('stock_email_settings'); // hapus cache SMTP sensitif saat logout
   sessionStorage.removeItem('stock_user');
   currentUser = null;
   updateUI();
@@ -2355,6 +2395,16 @@ function logout() {
 }
 function isAdmin() { return currentUser && currentUser.role === 'admin'; }
 function isLoggedIn() { return currentUser !== null; }
+function canAccessDashboard(dash) {
+  if (!currentUser) return false;
+  if (currentUser.auth_type !== 'supabase' || currentUser.role === 'admin') return true;
+  const allowed = {
+    operator: ['po','transfer','upload','opname','input','system_status'],
+    approver: ['po','audit','system_status'],
+    viewer: ['system_status']
+  };
+  return (allowed[currentUser.role] || []).includes(dash);
+}
 
 function updateUI() {
   const loginBtn = document.getElementById('loginBtn');
@@ -2369,7 +2419,7 @@ function updateUI() {
     loginBtn.style.display = 'none';
     logoutBtn.style.display = 'inline-block';
     userStatus.innerHTML = '🟢 ' + currentUser.username.toUpperCase();
-    authBtns.forEach(b => b.style.display = 'inline-block');
+    authBtns.forEach(b => b.style.display = canAccessDashboard(b.dataset.dash) ? 'inline-block' : 'none');
     if (usersBtn) usersBtn.style.display = isAdmin() ? 'inline-block' : 'none';
     if (adminFooterActions) adminFooterActions.style.display = isAdmin() ? 'flex' : 'none';
     
@@ -2379,7 +2429,7 @@ function updateUI() {
       const initials = currentUser.username.substring(0, 2).toUpperCase();
       document.getElementById('sidebarProfileAvatar').textContent = initials;
       document.getElementById('sidebarProfileName').textContent = currentUser.username.toUpperCase();
-      document.getElementById('sidebarProfileEmail').textContent = currentUser.username.toLowerCase() + '@livestock.id';
+      document.getElementById('sidebarProfileEmail').textContent = currentUser.email || (currentUser.username.toLowerCase() + '@livestock.id');
     }
   } else {
     if (profileCard) profileCard.style.display = 'none';
@@ -2389,7 +2439,7 @@ function updateUI() {
     authBtns.forEach(b => b.style.display = 'none');
     if (usersBtn) usersBtn.style.display = 'none';
     if (adminFooterActions) adminFooterActions.style.display = 'none';
-    if (['transfer','upload','opname','master','input','users','gerai','audit','backup'].includes(activeDash)) {
+    if (['transfer','upload','opname','master','input','users','gerai','audit','backup','system_status'].includes(activeDash)) {
       activeDash = 'ho';
       activeTab = 'ho';
       document.querySelectorAll('.dash-btn').forEach(b => {
@@ -2563,6 +2613,75 @@ async function deleteGerai(nama) {
 
 
 
+
+// ===== SUPABASE AUTH DUAL MODE (TRANSISI AMAN) =====
+const AUTH_TRANSITION_MODE = true;
+let latestDiagnostics = null;
+
+function readAuthSession(){try{return JSON.parse(localStorage.getItem('supabase_auth_session')||'null');}catch(e){return null;}}
+function saveAuthSession(session){if(session)localStorage.setItem('supabase_auth_session',JSON.stringify(session));else localStorage.removeItem('supabase_auth_session');}
+async function authApi(body, token=''){
+  const isVercel=window.location.hostname.endsWith('vercel.app');
+  if(isVercel){const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Autentikasi gagal');return j;}
+  let url=`${SUPABASE_URL}/auth/v1/token?grant_type=${body.action==='refresh'?'refresh_token':'password'}`;
+  if(body.action==='logout'){url=`${SUPABASE_URL}/auth/v1/logout`;}
+  const payload=body.action==='login'?{email:body.email,password:body.password}:body.action==='refresh'?{refresh_token:body.refresh_token}:null;
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${token||SUPABASE_ANON_KEY}`},body:payload?JSON.stringify(payload):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error_description||j.msg||j.message||'Autentikasi gagal');return j;
+}
+async function getValidSupabaseAccessToken(){
+  const s=readAuthSession();if(!s?.access_token)return null;
+  const expires=Number(s.expires_at||0);if(!expires||expires>Date.now()/1000+60)return s.access_token;
+  try{const fresh=await authApi({action:'refresh',refresh_token:s.refresh_token});saveAuthSession(fresh);return fresh.access_token||null;}catch(e){saveAuthSession(null);if(currentUser?.auth_type==='supabase'){sessionStorage.removeItem('stock_user');currentUser=null;}return null;}
+}
+async function loginWithSupabase(email,password){
+  const session=await authApi({action:'login',email,password});saveAuthSession(session);
+  let profile=null;
+  try{const {data,error}=await supabaseClient.from('profiles').select('*').eq('id',session.user.id);if(!error&&data?.length)profile=data[0];}catch(e){}
+  if(profile&&profile.active===false){saveAuthSession(null);throw new Error('Akun dinonaktifkan oleh Admin.');}
+  const role=profile?.role||session.user?.user_metadata?.role||'viewer';
+  currentUser={username:profile?.display_name||email.split('@')[0],email,role,auth_type:'supabase',user_id:session.user.id};
+  sessionStorage.setItem('stock_user',JSON.stringify(currentUser));return currentUser;
+}
+
+// ===== STATUS SISTEM & AUTOMATED READ-ONLY TESTS =====
+function recordSystemError(message,source='runtime'){try{const arr=JSON.parse(localStorage.getItem('livestock_error_log')||'[]');arr.unshift({time:new Date().toISOString(),source,message:String(message).slice(0,500)});localStorage.setItem('livestock_error_log',JSON.stringify(arr.slice(0,20)));}catch(e){}}
+function diagnosticBadge(ok,label){return `<span class="badge ${ok?'ok':'crit'}">${ok?'✓':'!'} ${label}</span>`;}
+function runDataIntegrityTests(){
+  const master=data.master||[],logs=data.logs||[],codes=new Set(master.map(m=>m.kode));
+  const masterKeys=new Set(),duplicateMaster=[];master.forEach(m=>{const k=`${getNormalizedStatus(m.status)}|${m.kode}`;if(masterKeys.has(k))duplicateMaster.push(k);masterKeys.add(k);});
+  const ids=new Set(),duplicateLogIds=[];logs.forEach(l=>{if(ids.has(l.id))duplicateLogIds.push(l.id);ids.add(l.id);});
+  const orphanLogs=logs.filter(l=>!codes.has(l.kode));
+  const invalidQty=logs.filter(l=>num(l.in)<0||num(l.out)<0||(num(l.in)<=0&&num(l.out)<=0));
+  const invalidDates=logs.filter(l=>!/^\d{4}-\d{2}-\d{2}$/.test(formatYMD(l.tanggal)));
+  const negativeStock=getAllStockRows().filter(r=>num(r.akhir)<0);
+  const tests=[
+    {name:'Kode master unik per gudang',ok:duplicateMaster.length===0,count:duplicateMaster.length},
+    {name:'ID log transaksi unik',ok:duplicateLogIds.length===0,count:duplicateLogIds.length},
+    {name:'Log memiliki kode master',ok:orphanLogs.length===0,count:orphanLogs.length},
+    {name:'Nilai transaksi valid',ok:invalidQty.length===0,count:invalidQty.length},
+    {name:'Format tanggal valid',ok:invalidDates.length===0,count:invalidDates.length},
+    {name:'Tidak ada stok negatif',ok:negativeStock.length===0,count:negativeStock.length}
+  ];
+  return {tests,summary:{master:master.length,logs:logs.length,gerai:(data.gerai||[]).length,po:(data.po||[]).length},details:{duplicateMaster:duplicateMaster.slice(0,20),duplicateLogIds:duplicateLogIds.slice(0,20),orphanLogs:orphanLogs.slice(0,20).map(x=>x.id),invalidQty:invalidQty.slice(0,20).map(x=>x.id),invalidDates:invalidDates.slice(0,20).map(x=>x.id),negativeStock:negativeStock.slice(0,20).map(x=>`${x.gudang}:${x.kode}`)}};
+}
+async function runSystemDiagnostics(){
+  const btn=document.getElementById('runDiagnosticsBtn'),box=document.getElementById('systemDiagnosticsContent');if(btn){btn.disabled=true;btn.textContent='⏳ Memeriksa...';}if(box)box.innerHTML='<div style="padding:20px;text-align:center;color:#67e8f9;">Menghubungi layanan dan memeriksa data...</div>';
+  const started=performance.now();let health={ok:false,database:{ok:false}},healthError='';
+  try{if(window.location.hostname.endsWith('vercel.app')){const r=await fetch('/api/health?ts='+Date.now(),{cache:'no-store'});health=await r.json();if(!r.ok&&!health.database)throw new Error('Health API '+r.status);}else{const {error}=await supabaseClient.from('master_barang').select('id').limit(1);health={ok:!error,database:{ok:!error,latency_ms:Math.round(performance.now()-started)},auth_proxy:{ok:true,mode:'local'}};}}catch(e){healthError=e.message;recordSystemError(e.message,'diagnostics');}
+  const integrity=runDataIntegrityTests(),queue=JSON.parse(localStorage.getItem('stock_offline_queue')||'[]'),email=JSON.parse(localStorage.getItem('stock_email_settings')||'null'),errors=JSON.parse(localStorage.getItem('livestock_error_log')||'[]');
+  let cronEvent=null;try{const {data:ev}=await supabaseClient.from('system_events').select('*').eq('event_key','daily_alert').limit(1);if(ev?.length)cronEvent=ev[0];}catch(e){}
+  latestDiagnostics={checked_at:new Date().toISOString(),health,healthError,integrity,offline_queue:queue.length,last_sync:localStorage.getItem('livestock_last_sync'),auth:{mode:AUTH_TRANSITION_MODE?'dual-transition':'supabase-only',logged_in:!!currentUser,type:currentUser?.auth_type||'public',role:currentUser?.role||'public'},email:{configured:!!email?.target,active:!!email?.active,recipient_count:(email?.target||'').split(',').filter(Boolean).length},cron:{schedule:'08:00 WIB',last_run:cronEvent?.last_run||null,status:cronEvent?.status||'unknown',message:cronEvent?.message||''},recent_errors:errors.slice(0,5)};
+  renderDiagnostics(latestDiagnostics);localStorage.setItem('livestock_last_diagnostics',JSON.stringify(latestDiagnostics));
+  if(btn){btn.disabled=false;btn.textContent='↻ Periksa Ulang';}
+}
+function renderDiagnostics(d){
+  const box=document.getElementById('systemDiagnosticsContent');if(!box)return;const passed=d.integrity.tests.filter(t=>t.ok).length,total=d.integrity.tests.length;document.getElementById('diagnosticLastRun').textContent='Terakhir: '+new Date(d.checked_at).toLocaleString('id-ID');
+  const cards=[['Database Supabase',d.health?.database?.ok, d.health?.database?.ok?`${d.health.database.latency_ms??'-'} ms`:(d.healthError||'Tidak terhubung')],['Supabase Auth',d.health?.auth_proxy?.ok,'Mode transisi dual login'],['Antrean Offline',d.offline_queue===0,`${d.offline_queue} transaksi tertunda`],['Email Alert',d.email.configured&&d.email.active,d.email.configured?`${d.email.recipient_count} penerima · ${d.email.active?'Aktif':'Nonaktif'}`:'Belum dikonfigurasi'],['Cron Harian',d.cron.status!=='error',d.cron.last_run?`${d.cron.status==='success'?'Berhasil':'Gagal'} · ${new Date(d.cron.last_run).toLocaleString('id-ID')}`:'Terjadwal '+d.cron.schedule],['Integritas Data',passed===total,`${passed}/${total} pemeriksaan lulus`]];
+  box.innerHTML=`<div class="analytics-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">${cards.map(c=>`<div class="chart-card" style="align-items:flex-start;min-height:112px;"><h4>${diagnosticBadge(c[1],c[0])}</h4><div style="font-size:12px;color:#c4b5fd;margin-top:8px;">${c[2]}</div></div>`).join('')}</div><div class="table-wrap" style="margin-top:12px;"><table><thead><tr><th>Pengujian Data</th><th>Hasil</th><th>Temuan</th></tr></thead><tbody>${d.integrity.tests.map(t=>`<tr><td>${t.name}</td><td>${diagnosticBadge(t.ok,t.ok?'Lulus':'Perlu diperiksa')}</td><td>${t.count}</td></tr>`).join('')}</tbody></table></div><div style="margin-top:12px;padding:11px;border:1px solid #302852;border-radius:12px;font-size:11px;color:#a29dbd;">Data lokal: <b>${d.integrity.summary.master}</b> master · <b>${d.integrity.summary.logs}</b> log · <b>${d.integrity.summary.gerai}</b> gerai · <b>${d.integrity.summary.po}</b> PO<br>Sinkronisasi terakhir: <b>${d.last_sync?new Date(d.last_sync).toLocaleString('id-ID'):'Belum tercatat'}</b> · Login: <b>${d.auth.type} / ${d.auth.role}</b>${d.recent_errors.length?`<br>Error terakhir: <span style="color:#fca5a5;">${d.recent_errors[0].message}</span>`:''}</div>`;
+}
+function downloadDiagnosticsReport(){const d=latestDiagnostics||JSON.parse(localStorage.getItem('livestock_last_diagnostics')||'null');if(!d){showToast('Jalankan pemeriksaan terlebih dahulu!','error');return;}downloadBlob(JSON.stringify(d,null,2),`Status_Sistem_${new Date().toISOString().replace(/[:.]/g,'-')}.json`,'application/json');}
+
+
 // ===== FILTER GLOBAL KONSISTEN + NAVIGASI MOBILE =====
 function getGlobalFilters(){
   return {
@@ -2730,6 +2849,7 @@ function approveBulkPreview(){const file=document.getElementById('fileUpload')?.
 
 function showPanel(dash) {
   const panels = {
+    system_status: 'panelSystemStatus',
     home: 'panelHome',
     forecast: 'panelForecast',
     po_recommendation: 'panelPoRecommendation',
@@ -2805,7 +2925,7 @@ function renderTabs() {
   const exportPanel = document.getElementById('exportLogPanel');
   if (!tabBar) return;
 
-  const nonStandardDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  const nonStandardDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'system_status', 'grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonStandardDashboards.includes(activeDash)) {
     tabBar.style.display = 'none';
     if (exportPanel) exportPanel.style.display = 'none';
@@ -3433,7 +3553,7 @@ function renderContent() {
   
   if (!container) return;
 
-  const nonTableDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  const nonTableDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'system_status', 'grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonTableDashboards.includes(activeDash)) {
     container.innerHTML = '';
     if (tableToolbarSection) tableToolbarSection.classList.add('hidden');
@@ -3587,12 +3707,15 @@ function renderContent() {
   }
 
   const totalRows = rows.length;
-  const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+  // Master dan stok ditampilkan hingga 250 baris per halaman agar barang tidak
+  // terlihat seperti hilang. Log tetap 25 baris agar browser tetap ringan.
+  const activePageSize = (isStockTab(activeTab) || activeTab.startsWith('master_')) ? 250 : rowsPerPage;
+  const totalPages = Math.ceil(totalRows / activePageSize) || 1;
   if (currentPage > totalPages) currentPage = totalPages;
   if (currentPage < 1) currentPage = 1;
 
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedRows = rows.slice(startIndex, startIndex + rowsPerPage);
+  const startIndex = (currentPage - 1) * activePageSize;
+  const paginatedRows = rows.slice(startIndex, startIndex + activePageSize);
 
   let html = preTableHtml + '<div class="table-wrap"><div class="scroll"><table><thead><tr>';
   cols.forEach(c => {
@@ -3687,7 +3810,7 @@ function renderContent() {
 
   html += `
     <div class="pagination-bar">
-      <span>Menampilkan ${totalRows === 0 ? 0 : startIndex + 1} - ${Math.min(startIndex + rowsPerPage, totalRows)} dari total ${totalRows} data</span>
+      <span>Menampilkan ${totalRows === 0 ? 0 : startIndex + 1} - ${Math.min(startIndex + activePageSize, totalRows)} dari total ${totalRows} data</span>
       <div class="flex" style="gap:4px;">
         <button class="btn" style="padding:3px 8px;" onclick="changePage(-1)" ${currentPage === 1 ? 'disabled style="opacity:0.4; cursor:default;"' : ''}>◀ Prev</button>
         <span style="padding:3px 6px; color:#f2a93b; font-weight:600;">Hal ${currentPage} / ${totalPages || 1}</span>
@@ -5737,6 +5860,7 @@ function refreshAll() {
   if (activeDash === 'home') renderExecutiveDashboard();
   if (activeDash === 'forecast') renderForecastDashboard();
   if (activeDash === 'po_recommendation') renderPoRecommendation();
+  if (activeDash === 'system_status') { const d=JSON.parse(localStorage.getItem('livestock_last_diagnostics')||'null'); if(d) renderDiagnostics(d); }
   renderContent();
   populateDropdowns();
   populateGlobalGerai();
@@ -5755,15 +5879,21 @@ document.addEventListener('DOMContentLoaded', function() {
     if (gfToggle) gfToggle.textContent = 'Tampilkan';
   }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleMobileMenu(false); });
+  window.addEventListener('error', e => recordSystemError(e.message || 'Unknown error', 'window'));
+  window.addEventListener('unhandledrejection', e => recordSystemError(e.reason?.message || e.reason || 'Unhandled rejection', 'promise'));
   setStatus('online', 'ONLINE');
 
   document.querySelectorAll('.dash-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const dash = this.dataset.dash;
       toggleMobileMenu(false);
-      if (!isLoggedIn() && ['transfer','upload','opname','master','input','users','gerai','audit','backup'].includes(dash)) {
+      if (!isLoggedIn() && ['transfer','upload','opname','master','input','users','gerai','audit','backup','system_status'].includes(dash)) {
         showToast('Silakan login terlebih dahulu!', 'error');
         showLogin();
+        return;
+      }
+      if (isLoggedIn() && this.classList.contains('auth-btn') && !canAccessDashboard(dash)) {
+        showToast('Akun Anda tidak memiliki izin untuk menu ini.', 'error');
         return;
       }
 
@@ -5775,13 +5905,14 @@ document.addEventListener('DOMContentLoaded', function() {
       renderTabs();
       renderChartsContainer();
 
-      if (dash === 'home' || dash === 'forecast' || dash === 'po_recommendation' || dash === 'backup' || dash === 'downloads') {
+      if (dash === 'home' || dash === 'forecast' || dash === 'po_recommendation' || dash === 'backup' || dash === 'system_status' || dash === 'downloads') {
         activeTab = dash;
         showPanel(dash);
         renderContent();
         if (dash === 'home') renderExecutiveDashboard();
         if (dash === 'forecast') renderForecastDashboard();
         if (dash === 'po_recommendation') renderPoRecommendation();
+        if (dash === 'system_status') runSystemDiagnostics();
         return;
       }
 
@@ -5868,6 +5999,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  if (!isAdmin()) localStorage.removeItem('stock_email_settings');
   updateUI();
   updateOfflineStatusUI();
   loadEmailSettings();
