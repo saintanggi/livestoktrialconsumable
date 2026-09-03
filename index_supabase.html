@@ -363,17 +363,21 @@
       <small id="userStatus">🟢 LIVE STOK</small>
     </div>
     <div class="dash-buttons" id="dashButtons">
+      <button class="dash-btn" data-dash="home" style="background:#7c3aed18;color:#c4b5fd;border-color:#7c3aed55;">🏠 Beranda</button>
       <button class="dash-btn active" data-dash="ho">🏢 HO</button>
       <button class="dash-btn" data-dash="agen">🏪 AGEN</button>
       <button class="dash-btn" data-dash="return">📦 RETURN</button>
       <button class="dash-btn auth-btn" data-dash="po" style="display:none; color:#58a6ff; border-color:#58a6ff55;">📄 PO & Penerimaan</button>
       <button class="dash-btn" data-dash="stok_harian">📅 Stok Harian</button>
+      <button class="dash-btn" data-dash="forecast" style="color:#c084fc;border-color:#7c3aed55;">🔮 Prediksi Stok</button>
+      <button class="dash-btn" data-dash="po_recommendation" style="color:#fbbf24;border-color:#f2a93b55;">🧮 Rekomendasi PO</button>
       <button class="dash-btn" data-dash="downloads" style="background:#22c55e12; color:#4ade80; border-color:#22c55e44;">📥 Download & Rekap</button>
       <button class="dash-btn" data-dash="grafik" style="background:#58a6ff1a; color:#58a6ff; border-color:#58a6ff44;">📈 Grafik Global</button>
       <button class="dash-btn auth-btn" data-dash="transfer" style="display:none;">🔄 Transfer</button>
       <button class="dash-btn auth-btn" data-dash="upload" style="display:none;">📁 Upload</button>
       <button class="dash-btn auth-btn" data-dash="opname" style="display:none;">📊 Opname</button>
       <button class="dash-btn auth-btn" data-dash="master" style="display:none;">⚙️ Master</button>
+      <button class="dash-btn auth-btn" data-dash="backup" style="display:none;color:#4ade80;border-color:#22c55e55;">🛡️ Backup & Pemulihan</button>
       <button class="dash-btn auth-btn" data-dash="gerai" style="display:none; color:#3fb950; border-color:#3fb95055;" data-dash-target="gerai">🏪 Gerai</button>
       <button class="dash-btn auth-btn" data-dash="audit" style="display:none; color:#ba75ff; border-color:#ba75ff55;" data-dash-target="audit">🔍 Audit Log</button>
       <button class="dash-btn auth-btn" data-dash="input" style="display:none;">➕ Transaksi manual <span class="shortcut-hint">Ctrl+I</span></button>
@@ -410,7 +414,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e8898c858186a884819e8d9b9c878b83c6818c">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail">admin@livestock.id</span>
       </div>
     </div>
   </div>
@@ -429,6 +433,58 @@
   </div>
 
   <div class="wrap">
+
+
+    <!-- BERANDA RINGKASAN EKSEKUTIF (FITUR TAMBAHAN, TIDAK MENGUBAH DASHBOARD GUDANG) -->
+    <div class="panel hidden" id="panelHome">
+      <div id="executiveDashboardContent"></div>
+    </div>
+
+    <!-- PREDIKSI STOK HABIS 30 HARI -->
+    <div class="panel hidden" id="panelForecast">
+      <div style="background:linear-gradient(135deg,rgba(124,58,237,.20),rgba(6,182,212,.10));border:1px solid #7c3aed55;border-radius:16px;padding:20px;margin-bottom:14px;">
+        <h3 style="margin:0 0 5px;">🔮 Prediksi Stok Habis</h3>
+        <p style="margin:0;color:#a29dbd;font-size:12px;">Estimasi berdasarkan rata-rata transaksi OUT selama 30 hari terakhir. Hasil prediksi bersifat rekomendasi dan tidak mengubah stok.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <select id="forecastWarehouse" onchange="renderForecastDashboard()" style="max-width:170px;"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option></select>
+        <select id="forecastRisk" onchange="renderForecastDashboard()" style="max-width:190px;"><option value="ALL">Semua Prediksi</option><option value="URGENT">≤ 7 hari</option><option value="SOON">8–30 hari</option><option value="NO_USAGE">Tanpa pengeluaran</option></select>
+        <button class="btn btn-success" onclick="exportForecastExcel()">📥 Download Prediksi</button>
+      </div>
+      <div id="forecastSummary"></div><div id="forecastTable"></div>
+    </div>
+
+    <!-- REKOMENDASI PO OTOMATIS -->
+    <div class="panel hidden" id="panelPoRecommendation">
+      <div style="background:linear-gradient(135deg,rgba(242,169,59,.16),rgba(124,58,237,.10));border:1px solid #f2a93b55;border-radius:16px;padding:20px;margin-bottom:14px;">
+        <h3 style="margin:0 0 5px;">🧮 Rekomendasi PO Otomatis</h3>
+        <p style="margin:0;color:#a29dbd;font-size:12px;">Rekomendasi QTY untuk memenuhi kebutuhan 30 hari ditambah buffer. Tidak membuat PO secara otomatis sehingga proses PO lama tetap aman.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <select id="poRecWarehouse" onchange="renderPoRecommendation()" style="max-width:170px;"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option></select>
+        <button class="btn btn-success" onclick="exportPoRecommendation()">📥 Download Rekomendasi PO</button>
+      </div>
+      <div id="poRecommendationContent"></div>
+    </div>
+
+    <!-- BACKUP & PEMULIHAN -->
+    <div class="panel hidden" id="panelBackup">
+      <div style="background:linear-gradient(135deg,rgba(34,197,94,.14),rgba(6,182,212,.08));border:1px solid #22c55e44;border-radius:16px;padding:20px;margin-bottom:14px;">
+        <h3 style="margin:0 0 5px;">🛡️ Backup & Pemulihan Data</h3>
+        <p style="margin:0;color:#a29dbd;font-size:12px;">Backup tidak mengubah data. Pemulihan memakai preview, konfirmasi admin, dan hanya menggabungkan data berdasarkan ID—tidak menghapus data yang sudah ada.</p>
+      </div>
+      <div class="analytics-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
+        <div class="chart-card" style="align-items:flex-start;min-height:170px;">
+          <h4>📤 Buat Backup</h4><p style="font-size:11px;color:#8b86a7;">Simpan seluruh master, log, gerai, PO, penerimaan, dan audit.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button class="btn btn-success" onclick="downloadBackupJSON()">JSON Lengkap</button><button class="btn btn-primary" onclick="downloadBackupExcel()">Excel Multi-Sheet</button></div>
+        </div>
+        <div class="chart-card" style="align-items:flex-start;min-height:170px;">
+          <h4>📥 Preview Pemulihan</h4><p style="font-size:11px;color:#8b86a7;">Pilih backup JSON dari sistem ini. Data belum berubah sebelum dikonfirmasi.</p>
+          <input type="file" id="restoreBackupFile" accept=".json" onchange="previewRestoreBackup()" style="margin-top:8px;">
+          <div id="restorePreview" style="width:100%;margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
 
     <!-- PANEL GRAFIK KHUSUS TERPISAH -->
     <div class="panel hidden" id="panelGrafik">
@@ -668,8 +724,9 @@
             <input type="file" id="fileUpload" accept=".xlsx" style="display:none;">
           </label>
           <span id="fileName">Belum ada file</span>
-          <button class="btn btn-primary" onclick="processBulk()">🚀 Proses & Sync Transaksi</button>
+          <button class="btn btn-primary" onclick="previewBulkUpload()">🔍 Preview & Validasi</button>
         </div>
+        <div id="bulkPreviewBox" class="hidden" style="margin-top:12px;"></div>
       </div>
 
       <!-- ALAT PEMELIHARAAN DATABASE (CLEAN-UP) -->
@@ -845,6 +902,7 @@
             <button class="btn btn-success" onclick="exportStokByWarehouse('ho')">📥 Stok HO</button>
             <button class="btn btn-success" onclick="exportStokByWarehouse('agen')">📥 Stok AGEN</button>
             <button class="btn btn-success" onclick="exportStokByWarehouse('return')">📥 Stok RETURN</button>
+            <button class="btn btn-primary" onclick="exportAllStockWorkbook()">📚 Semua Stok (3 Sheet)</button>
           </div>
         </div>
       </div>
@@ -995,7 +1053,7 @@
   </div>
 </div>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script>
 // --- KONFIGURASI SUPABASE ---
 // Silakan ganti dengan URL dan ANON KEY dari dasbor proyek Supabase Anda
 const SUPABASE_URL = "https://qdljeibmnolizjprignz.supabase.co";
@@ -2417,8 +2475,150 @@ async function deleteGerai(nama) {
   }
 }
 
+
+// ===== FITUR ANALITIK TAMBAHAN: PREDIKSI 30 HARI, BERANDA, PO, BACKUP =====
+const FORECAST_WINDOW_DAYS = 30;
+const PO_TARGET_DAYS = 30;
+let pendingRestoreBackup = null;
+
+function getAllStockRows() {
+  const result = [];
+  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key, gudang]) => {
+    (data[key] || []).forEach(item => result.push(Object.assign({}, item, { gudang })));
+  });
+  return result;
+}
+
+function getForecastRows() {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - (FORECAST_WINDOW_DAYS - 1));
+  const outMap = {};
+  (data.logs || []).forEach(log => {
+    const dText = formatYMD(log.tanggal);
+    const d = new Date(dText + 'T00:00:00');
+    if (isNaN(d.getTime()) || d < start || d > today) return;
+    const key = getNormalizedStatus(log.status) + '|' + log.kode;
+    outMap[key] = (outMap[key] || 0) + num(log.out);
+  });
+
+  return getAllStockRows().map(item => {
+    const totalOut30 = outMap[item.gudang + '|' + item.kode] || 0;
+    const avgOut = totalOut30 / FORECAST_WINDOW_DAYS;
+    const stock = num(item.akhir);
+    let daysToEmpty = null;
+    if (avgOut > 0) daysToEmpty = stock <= 0 ? 0 : Math.ceil(stock / avgOut);
+    let estimatedDate = null;
+    if (daysToEmpty !== null) {
+      const d = new Date(today); d.setDate(d.getDate() + daysToEmpty);
+      estimatedDate = d.toISOString().split('T')[0];
+    }
+    const recommendation = Math.max(0, Math.ceil((avgOut * PO_TARGET_DAYS) + num(item.buffer) - Math.max(0, stock)));
+    const risk = daysToEmpty === null ? 'NO_USAGE' : daysToEmpty <= 7 ? 'URGENT' : daysToEmpty <= 30 ? 'SOON' : 'SAFE';
+    return Object.assign({}, item, { stock, totalOut30, avgOut, daysToEmpty, estimatedDate, recommendation, forecastRisk:risk });
+  });
+}
+
+function forecastBadge(row) {
+  if (row.daysToEmpty === null) return '<span class="badge ok">Tidak ada OUT</span>';
+  if (row.daysToEmpty <= 7) return `<span class="badge crit">${row.daysToEmpty} hari</span>`;
+  if (row.daysToEmpty <= 30) return `<span class="badge warn">${row.daysToEmpty} hari</span>`;
+  return `<span class="badge ok">${row.daysToEmpty} hari</span>`;
+}
+
+function renderExecutiveDashboard() {
+  const el = document.getElementById('executiveDashboardContent'); if (!el) return;
+  const rows = getAllStockRows(), forecasts = getForecastRows();
+  const totalStock = rows.reduce((s,r)=>s+num(r.akhir),0);
+  const crit = rows.filter(r=>r.status==='crit').length, warn = rows.filter(r=>r.status==='warn').length;
+  const today = new Date().toISOString().split('T')[0];
+  const todayLogs = (data.logs||[]).filter(l=>formatYMD(l.tanggal)===today);
+  const inToday=todayLogs.reduce((s,l)=>s+num(l.in),0), outToday=todayLogs.reduce((s,l)=>s+num(l.out),0);
+  const urgent = forecasts.filter(r=>r.daysToEmpty!==null && r.daysToEmpty<=7).sort((a,b)=>a.daysToEmpty-b.daysToEmpty).slice(0,8);
+  const recent=(data.logs||[]).slice().sort((a,b)=>String(b.tanggal).localeCompare(String(a.tanggal))).slice(0,6);
+  el.innerHTML=`
+    <div style="background:linear-gradient(135deg,#21163f,#101827);border:1px solid #7c3aed55;border-radius:16px;padding:20px;margin-bottom:14px;"><h3 style="margin:0 0 5px;">🏠 Ringkasan Eksekutif</h3><p style="margin:0;color:#a29dbd;font-size:12px;">Kondisi seluruh gudang dalam satu tampilan. Data hanya dibaca, tidak mengubah transaksi.</p></div>
+    <div class="kpi-row" style="display:grid;margin-bottom:14px;">
+      <div class="kpi"><div class="kpi-info"><span class="label">Total Stok Global</span><span class="value">${fmt(totalStock)}</span></div><div class="kpi-icon">📦</div></div>
+      <div class="kpi"><div class="kpi-info"><span class="label">Kritis / Waspada</span><span class="value">${crit} / ${warn}</span></div><div class="kpi-icon">⚠️</div></div>
+      <div class="kpi"><div class="kpi-info"><span class="label">IN / OUT Hari Ini</span><span class="value" style="font-size:20px;">+${fmt(inToday)} / -${fmt(outToday)}</span></div><div class="kpi-icon">↔️</div></div>
+    </div>
+    <div class="analytics-grid" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr));">
+      <div class="chart-card" style="align-items:stretch;"><h4>🚨 Prediksi Habis ≤ 7 Hari</h4><div class="scroll" style="max-height:300px;"><table><thead><tr><th>Gudang</th><th>Barang</th><th>Stok</th><th>Estimasi</th></tr></thead><tbody>${urgent.length?urgent.map(r=>`<tr><td>${r.gudang}</td><td>${r.item}</td><td class="text-right">${fmt(r.stock)}</td><td>${forecastBadge(r)}</td></tr>`).join(''):'<tr><td colspan="4" class="text-center text-muted">Tidak ada prediksi mendesak</td></tr>'}</tbody></table></div></div>
+      <div class="chart-card" style="align-items:stretch;"><h4>🕘 Aktivitas Terbaru</h4><div class="scroll" style="max-height:300px;"><table><thead><tr><th>Tanggal</th><th>Gudang</th><th>Barang</th><th>IN/OUT</th></tr></thead><tbody>${recent.map(l=>`<tr><td>${formatDateSimple(l.tanggal)}</td><td>${getNormalizedStatus(l.status)}</td><td>${l.item}</td><td>${num(l.in)>0?'+'+fmt(num(l.in)):'-'+fmt(num(l.out))}</td></tr>`).join('')}</tbody></table></div></div>
+    </div>`;
+}
+
+function renderForecastDashboard() {
+  const warehouse=document.getElementById('forecastWarehouse')?.value||'ALL';
+  const risk=document.getElementById('forecastRisk')?.value||'ALL';
+  let rows=getForecastRows().filter(r=>(warehouse==='ALL'||r.gudang===warehouse)&&(risk==='ALL'||r.forecastRisk===risk));
+  rows.sort((a,b)=>(a.daysToEmpty??999999)-(b.daysToEmpty??999999));
+  const urgent=rows.filter(r=>r.daysToEmpty!==null&&r.daysToEmpty<=7).length, soon=rows.filter(r=>r.daysToEmpty>7&&r.daysToEmpty<=30).length;
+  document.getElementById('forecastSummary').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><span class="badge crit">≤ 7 hari: ${urgent}</span><span class="badge warn">8–30 hari: ${soon}</span><span class="badge ok">Total: ${rows.length}</span></div>`;
+  document.getElementById('forecastTable').innerHTML=`<div class="table-wrap"><div class="scroll"><table><thead><tr><th>Gudang</th><th>Kode</th><th>Nama Barang</th><th>Satuan</th><th class="text-right">Stok Akhir</th><th class="text-right">OUT 30 Hari</th><th class="text-right">Rata-rata OUT/Hari</th><th>Estimasi Habis</th><th>Perkiraan Tanggal</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="badge ok">${r.gudang}</span></td><td class="text-muted">${r.kode}</td><td>${r.item}</td><td>${r.satuan}</td><td class="text-right">${fmt(r.stock)}</td><td class="text-right">${fmt(r.totalOut30)}</td><td class="text-right">${r.avgOut.toLocaleString('id-ID',{maximumFractionDigits:2})}</td><td>${forecastBadge(r)}</td><td>${r.estimatedDate?formatDateSimple(r.estimatedDate):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+function forecastExportRows(rows) { return rows.map((r,i)=>({'NO':i+1,'GUDANG':r.gudang,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AKHIR':r.stock,'TOTAL OUT 30 HARI':r.totalOut30,'RATA-RATA OUT/HARI':Number(r.avgOut.toFixed(2)),'ESTIMASI HARI HABIS':r.daysToEmpty===null?'TIDAK ADA OUT':r.daysToEmpty,'PERKIRAAN TANGGAL HABIS':r.estimatedDate||'-','REKOMENDASI PO 30 HARI':r.recommendation})); }
+function exportForecastExcel(){ if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;} const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(forecastExportRows(getForecastRows())),'Prediksi_Stok');XLSX.writeFile(wb,`Prediksi_Stok_30_Hari_${new Date().toISOString().split('T')[0]}.xlsx`); }
+
+function renderPoRecommendation(){ const wh=document.getElementById('poRecWarehouse')?.value||'ALL';const rows=getForecastRows().filter(r=>r.recommendation>0&&(wh==='ALL'||r.gudang===wh)).sort((a,b)=>b.recommendation-a.recommendation);document.getElementById('poRecommendationContent').innerHTML=`<div style="margin-bottom:10px;"><span class="badge warn">${rows.length} barang direkomendasikan</span></div><div class="table-wrap"><div class="scroll"><table><thead><tr><th>Gudang</th><th>Kode</th><th>Nama Barang</th><th class="text-right">Stok</th><th class="text-right">Buffer</th><th class="text-right">Avg OUT/Hari</th><th class="text-right">Kebutuhan 30 Hari</th><th class="text-right">Rekomendasi QTY PO</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${r.gudang}</td><td class="text-muted">${r.kode}</td><td>${r.item}</td><td class="text-right">${fmt(r.stock)}</td><td class="text-right">${fmt(r.buffer)}</td><td class="text-right">${r.avgOut.toLocaleString('id-ID',{maximumFractionDigits:2})}</td><td class="text-right">${fmt(Math.ceil(r.avgOut*PO_TARGET_DAYS))}</td><td class="text-right" style="color:#fbbf24;font-weight:800;">${fmt(r.recommendation)}</td></tr>`).join(''):'<tr><td colspan="8" class="text-center text-muted">Belum ada barang yang membutuhkan rekomendasi PO</td></tr>'}</tbody></table></div></div>`; }
+function exportPoRecommendation(){if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}const rows=getForecastRows().filter(r=>r.recommendation>0);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(forecastExportRows(rows)),'Rekomendasi_PO');XLSX.writeFile(wb,`Rekomendasi_PO_30_Hari_${new Date().toISOString().split('T')[0]}.xlsx`);}
+
+function exportAllStockWorkbook(){
+  if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
+  const start=document.getElementById('stockExportStart')?.value||'', end=document.getElementById('stockExportEnd')?.value||'';
+  if(start&&end&&start>end){showToast('Tanggal mulai tidak boleh melebihi tanggal selesai!','error');return;}
+  const wb=XLSX.utils.book_new();
+  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,label])=>{const rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
+  XLSX.writeFile(wb,`Rekap_Semua_Stok_${start||'awal'}_sd_${end||'berjalan'}.xlsx`);showToast('✅ Semua stok berhasil didownload dalam 3 sheet!','success');
+}
+
+function createBackupPayload(){return {app:'LiveStockConsumable',version:2,created_at:new Date().toISOString(),created_by:currentUser?.username||'System',data:JSON.parse(JSON.stringify(data))};}
+function downloadBlob(content,name,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function downloadBackupJSON(){if(!isAdmin()){showToast('Hanya admin yang dapat membuat backup!','error');return;}const d=new Date().toISOString().replace(/[:.]/g,'-');downloadBlob(JSON.stringify(createBackupPayload(),null,2),`Backup_LiveStock_${d}.json`,'application/json');addAudit('BACKUP_EXPORT','Mengunduh backup JSON lengkap');showToast('✅ Backup JSON berhasil dibuat!','success');}
+function downloadBackupExcel(){if(!isAdmin()){showToast('Hanya admin yang dapat membuat backup!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}const wb=XLSX.utils.book_new();const sheets={Master:data.master||[],Log_Transaksi:data.logs||[],Gerai:(data.gerai||[]).map(n=>({nama:n})),Purchase_Orders:data.po||[],PO_Deliveries:data.po_deliveries||[],Audit:data.audit||[]};Object.entries(sheets).forEach(([n,r])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r),n.slice(0,31)));XLSX.writeFile(wb,`Backup_LiveStock_${new Date().toISOString().split('T')[0]}.xlsx`);addAudit('BACKUP_EXPORT','Mengunduh backup Excel multi-sheet');}
+function previewRestoreBackup(){
+  if(!isAdmin()){showToast('Hanya admin yang dapat memulihkan backup!','error');return;}
+  const file=document.getElementById('restoreBackupFile')?.files?.[0], box=document.getElementById('restorePreview');pendingRestoreBackup=null;if(!file)return;
+  const reader=new FileReader();reader.onload=e=>{try{const payload=JSON.parse(e.target.result);const d=payload.data;if(!d||!Array.isArray(d.master)||!Array.isArray(d.logs))throw new Error('Struktur backup tidak valid');pendingRestoreBackup=payload;box.innerHTML=`<div style="padding:10px;border:1px solid #22c55e55;border-radius:10px;background:#22c55e0d;font-size:11px;"><b style="color:#4ade80;">✅ Backup valid — belum diterapkan</b><br>Master: ${d.master.length} · Log: ${d.logs.length} · Gerai: ${(d.gerai||[]).length} · PO: ${(d.po||[]).length}<br>Dibuat: ${formatDateSimple(payload.created_at)}<br><button class="btn btn-danger" style="margin-top:8px;" onclick="confirmRestoreBackup()">Konfirmasi & Gabungkan Backup</button></div>`;}catch(err){box.innerHTML=`<span class="badge crit">File tidak valid: ${err.message}</span>`;}};reader.readAsText(file);
+}
+async function upsertInChunks(table,rows,size=400){for(let i=0;i<rows.length;i+=size){const {error}=await supabaseClient.from(table).upsert(rows.slice(i,i+size));if(error)throw error;}}
+async function confirmRestoreBackup(){
+  if(!isAdmin()||!pendingRestoreBackup){showToast('Preview backup belum valid!','error');return;}
+  if(!confirm('PEMULIHAN BACKUP akan menggabungkan data ke Supabase berdasarkan ID. Data saat ini tidak dihapus. Lanjutkan?'))return;
+  const typed=prompt('Ketik PULIHKAN untuk konfirmasi akhir:');if(typed!=='PULIHKAN'){showToast('Pemulihan dibatalkan.','info');return;}
+  const d=pendingRestoreBackup.data;localStorage.setItem('stock_pre_restore_safety',JSON.stringify(createBackupPayload()));setStatus('syncing','RESTORING...');
+  try{
+    const master=(d.master||[]).map(m=>({id:m.id||('m_restore_'+Math.random().toString(36).slice(2)),kode:m.kode,item:m.item,status:getNormalizedStatus(m.status),satuan:m.satuan||'PCS',buffer:num(m.buffer),awal:num(m.awal),foto_barang_url:m.foto_barang_url||'-'}));
+    const logs=(d.logs||[]).map(l=>({id:l.id||genId(),tanggal:formatYMD(l.tanggal),no_ticket:l.ticket||'-',kode_item:l.kode,nama_item:l.item,status_item:getNormalizedStatus(l.status),in:String(l.in??'-'),out:String(l.out??'-'),nama_gerai:l.gerai||'-',keterangan:l.ket||'-',user:l.user||'System',no_resi:l.no_resi||'-'}));
+    await upsertInChunks('master_barang',master);await upsertInChunks('log_transaksi',logs);
+    if((d.gerai||[]).length)await upsertInChunks('gerai',d.gerai.map(n=>({nama:n})));
+    if((d.po||[]).length)await upsertInChunks('purchase_orders',d.po.map(p=>({id:p.id,tgl_order:p.tgl_order,no_po:p.no_po,nama_vendor:p.nama_vendor,kode_barang:p.kode_barang,nama_barang:p.nama_barang,gudang:p.gudang,qty_order:num(p.qty_order),due_date:p.due_date})));
+    if((d.po_deliveries||[]).length)await upsertInChunks('po_deliveries',d.po_deliveries.map(x=>({id:x.id,no_po:x.no_po,tgl_masuk:x.tgl_masuk,no_sj:x.no_sj,qty_masuk:num(x.qty_masuk),keterangan:x.keterangan||'-',user_penerima:x.user_penerima||'System',foto_sj_url:x.foto_sj_url||'-'})));
+    addAudit('RESTORE_BACKUP',`Menggabungkan backup ${pendingRestoreBackup.created_at||''}`);pendingRestoreBackup=null;await pullData();showToast('✅ Pemulihan selesai dan data telah dimuat ulang!','success');
+  }catch(err){console.error(err);showToast('❌ Pemulihan berhenti: '+(err.message||JSON.stringify(err)),'error');setStatus('offline','RESTORE ERROR');}
+}
+
+// ===== PREVIEW & VALIDASI UPLOAD MASSAL =====
+let bulkPreviewApprovedSignature='';
+function bulkFileSignature(file){return file?`${file.name}|${file.size}|${file.lastModified}`:'';}
+function previewBulkUpload(){
+  const input=document.getElementById('fileUpload'),file=input?.files?.[0],box=document.getElementById('bulkPreviewBox');
+  if(!file||!box){showToast('Pilih file Excel dulu!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
+  bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0;const seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=Number(r[4])||0,ticket=String(r[1]||'').trim(),tglRaw=r[0],m=data.master.find(x=>x.kode===kode);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!ticket)reason.push('Ticket kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const tgl=excelDateToISO(tglRaw),key=`${tgl}|${ticket}|${kode}`;if(seen.has(key)||data.logs.some(l=>formatYMD(l.tanggal)===tgl&&String(l.ticket).trim()===ticket&&String(l.kode).trim()===kode))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
+  box.classList.remove('hidden');box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'crit':'ok'}">Potensi stok negatif: ${negative}</span></div>${invalid.length?`<div style="font-size:10px;color:#fca5a5;max-height:90px;overflow:auto;">${invalid.slice(0,20).map(x=>`Baris ${x.baris}: ${x.reason}`).join('<br>')}</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;}catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${err.message}</span>`;}};reader.readAsArrayBuffer(file);
+}
+function approveBulkPreview(){const file=document.getElementById('fileUpload')?.files?.[0];if(!file)return;bulkPreviewApprovedSignature=bulkFileSignature(file);processBulk();}
+
+
 function showPanel(dash) {
   const panels = {
+    home: 'panelHome',
+    forecast: 'panelForecast',
+    po_recommendation: 'panelPoRecommendation',
+    backup: 'panelBackup',
     grafik: 'panelGrafik',
     gerai: 'panelGerai',
     audit: 'panelAudit',
@@ -2488,7 +2688,7 @@ function renderTabs() {
   const exportPanel = document.getElementById('exportLogPanel');
   if (!tabBar) return;
 
-  const nonStandardDashboards = ['grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  const nonStandardDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonStandardDashboards.includes(activeDash)) {
     tabBar.style.display = 'none';
     if (exportPanel) exportPanel.style.display = 'none';
@@ -3111,7 +3311,7 @@ function renderContent() {
   
   if (!container) return;
 
-  const nonTableDashboards = ['grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  const nonTableDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonTableDashboards.includes(activeDash)) {
     container.innerHTML = '';
     if (tableToolbarSection) tableToolbarSection.classList.add('hidden');
@@ -4418,6 +4618,9 @@ async function syncReportToGAS() {
 document.getElementById('fileUpload')?.addEventListener('change', function(e) {
   const file = e.target.files[0];
   document.getElementById('fileName').textContent = file ? file.name : 'Belum ada file';
+  bulkPreviewApprovedSignature = '';
+  const previewBox = document.getElementById('bulkPreviewBox');
+  if (previewBox) { previewBox.classList.add('hidden'); previewBox.innerHTML = ''; }
 });
 
 async function processBulk() {
@@ -4428,6 +4631,13 @@ async function processBulk() {
   }
   const fileInput = document.getElementById('fileUpload');
   if (!fileInput.files.length) { showToast('Pilih file Excel dulu!', 'error'); return; }
+  const currentBulkSignature = bulkFileSignature(fileInput.files[0]);
+  if (bulkPreviewApprovedSignature !== currentBulkSignature) {
+    previewBulkUpload();
+    showToast('Periksa preview lalu klik Konfirmasi & Proses.', 'info');
+    return;
+  }
+  bulkPreviewApprovedSignature = ''; // setiap proses baru wajib melewati preview kembali
 
   const reader = new FileReader();
   reader.onload = async function(e) {
@@ -4462,7 +4672,7 @@ async function processBulk() {
         const ketRaw = (r[6] === undefined || r[6] === null) ? '' : String(r[6]).trim();
         const ket = ketRaw !== '' ? ketRaw : '-';
 
-        if (!kode || qty <= 0) continue;
+        if (!r[0] || !r[1] || !kode || qty <= 0 || !['in', 'out'].includes(jenis)) continue;
 
         const master = data.master.find(m => m.kode === kode);
         if (!master) continue;
@@ -5405,7 +5615,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.dash-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const dash = this.dataset.dash;
-      if (!isLoggedIn() && ['transfer','upload','opname','master','input','users','gerai','audit'].includes(dash)) {
+      if (!isLoggedIn() && ['transfer','upload','opname','master','input','users','gerai','audit','backup'].includes(dash)) {
         showToast('Silakan login terlebih dahulu!', 'error');
         showLogin();
         return;
@@ -5418,6 +5628,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
       renderTabs();
       renderChartsContainer();
+
+      if (dash === 'home' || dash === 'forecast' || dash === 'po_recommendation' || dash === 'backup' || dash === 'downloads') {
+        activeTab = dash;
+        showPanel(dash);
+        renderContent();
+        if (dash === 'home') renderExecutiveDashboard();
+        if (dash === 'forecast') renderForecastDashboard();
+        if (dash === 'po_recommendation') renderPoRecommendation();
+        return;
+      }
 
       if (dash === 'grafik') {
         activeTab = 'grafik';
