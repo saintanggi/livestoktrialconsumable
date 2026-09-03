@@ -368,6 +368,7 @@
       <button class="dash-btn" data-dash="return">📦 RETURN</button>
       <button class="dash-btn auth-btn" data-dash="po" style="display:none; color:#58a6ff; border-color:#58a6ff55;">📄 PO & Penerimaan</button>
       <button class="dash-btn" data-dash="stok_harian">📅 Stok Harian</button>
+      <button class="dash-btn" data-dash="downloads" style="background:#22c55e12; color:#4ade80; border-color:#22c55e44;">📥 Download & Rekap</button>
       <button class="dash-btn" data-dash="grafik" style="background:#58a6ff1a; color:#58a6ff; border-color:#58a6ff44;">📈 Grafik Global</button>
       <button class="dash-btn auth-btn" data-dash="transfer" style="display:none;">🔄 Transfer</button>
       <button class="dash-btn auth-btn" data-dash="upload" style="display:none;">📁 Upload</button>
@@ -409,7 +410,7 @@
       <div class="profile-avatar" id="sidebarProfileAvatar">AD</div>
       <div class="profile-info">
         <span class="profile-name" id="sidebarProfileName">Admin Gudang</span>
-        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f697929b9f98b69a9f8093858299959dd89f92">[email&#160;protected]</a></span>
+        <span class="profile-email" id="sidebarProfileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e8898c858186a884819e8d9b9c878b83c6818c">[email&#160;protected]</a></span>
       </div>
     </div>
   </div>
@@ -805,26 +806,48 @@
       <div class="kpi"><div class="label">Total Stok</div><div class="value">0</div></div>
     </div>
 
-    <!-- PANEL DOWNLOAD LOG TERPISAH BERDASARKAN FILTER TANGGAL -->
-    <div class="export-panel" id="exportLogPanel">
-      <span style="font-size: 11px; font-weight: bold; color: #f2a93b;">📥 Download Log Transaksi:</span>
-      <div class="date-filter-box">
-        <span>Dari:</span> <input type="date" id="exportStart" value="2026-08-01">
-        <span>s/d</span> <input type="date" id="exportEnd" value="2026-08-04">
+    <!-- DASHBOARD DOWNLOAD & REKAP KHUSUS -->
+    <div class="panel hidden" id="panelDownloads">
+      <div style="background:linear-gradient(135deg,rgba(34,197,94,.14),rgba(124,58,237,.10)); border:1px solid rgba(74,222,128,.24); border-radius:16px; padding:20px; margin-bottom:16px;">
+        <h3 style="margin:0 0 6px; color:#f5f3ff;">📥 Dashboard Download & Rekap</h3>
+        <p style="margin:0; color:#a29dbd; font-size:12px;">Pusat unduhan khusus untuk Log Transaksi dan Rekap Stok HO, AGEN, serta RETURN.</p>
       </div>
-      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('HO')">📥 Excel HO</button>
-      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('AGEN')">📥 Excel AGEN</button>
-      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('RETURN')">📥 Excel RETURN</button>
-      <button class="btn btn-primary" style="padding: 4px 10px; font-size: 11px;" onclick="exportLogByWarehouse('ALL')">📥 Excel Semua</button>
-    </div>
 
-    <!-- PANEL DOWNLOAD REKAP STOK TERPISAH (HO / AGEN / RETURN) -->
-    <div class="export-panel" id="exportStokPanel">
-      <span style="font-size: 11px; font-weight: bold; color: #3fb950;">📦 Download Rekap Stok (Total In, Total Out &amp; Stok Akhir):</span>
-      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportStokByWarehouse('ho')">📥 Stok HO</button>
-      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportStokByWarehouse('agen')">📥 Stok AGEN</button>
-      <button class="btn btn-success" style="padding: 4px 10px; font-size: 11px;" onclick="exportStokByWarehouse('return')">📥 Stok RETURN</button>
-      <span style="font-size: 10px; color: #8b949e;">💡 Jika filter tanggal tabel stok aktif, file mengikuti periode tersebut.</span>
+      <!-- DOWNLOAD LOG TRANSAKSI -->
+      <div class="export-panel" id="exportLogPanel" style="display:flex; border-radius:16px; padding:18px; margin-bottom:14px; background:linear-gradient(135deg,#18152b,#12101f); border-color:#f2a93b44;">
+        <div style="width:100%;">
+          <div style="font-size:14px; font-weight:800; color:#fbbf24; margin-bottom:4px;">🧾 Download Log Transaksi</div>
+          <div style="font-size:11px; color:#8b86a7; margin-bottom:12px;">Pilih periode transaksi, lalu download per gudang atau seluruh gudang.</div>
+          <div style="display:flex; gap:9px; align-items:center; flex-wrap:wrap;">
+            <div class="date-filter-box">
+              <span>Dari:</span> <input type="date" id="exportStart" value="2026-08-01">
+              <span>s/d</span> <input type="date" id="exportEnd" value="2026-08-04">
+            </div>
+            <button class="btn btn-success" onclick="exportLogByWarehouse('HO')">📥 Excel HO</button>
+            <button class="btn btn-success" onclick="exportLogByWarehouse('AGEN')">📥 Excel AGEN</button>
+            <button class="btn btn-success" onclick="exportLogByWarehouse('RETURN')">📥 Excel RETURN</button>
+            <button class="btn btn-primary" onclick="exportLogByWarehouse('ALL')">📥 Excel Semua</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOWNLOAD REKAP STOK -->
+      <div class="export-panel" id="exportStokPanel" style="display:flex; border-radius:16px; padding:18px; background:linear-gradient(135deg,#141f22,#12101f); border-color:#3fb95044;">
+        <div style="width:100%;">
+          <div style="font-size:14px; font-weight:800; color:#4ade80; margin-bottom:4px;">📦 Download Rekap Stok</div>
+          <div style="font-size:11px; color:#8b86a7; margin-bottom:12px;">File berisi Stok Awal, Total IN, Total OUT, dan Stok Akhir. Tanggal boleh dikosongkan untuk total berjalan.</div>
+          <div style="display:flex; gap:9px; align-items:center; flex-wrap:wrap;">
+            <div class="date-filter-box">
+              <span>Dari:</span> <input type="date" id="stockExportStart">
+              <span>s/d</span> <input type="date" id="stockExportEnd">
+              <button class="btn" style="padding:3px 7px; font-size:10px;" onclick="document.getElementById('stockExportStart').value=''; document.getElementById('stockExportEnd').value=''">Reset</button>
+            </div>
+            <button class="btn btn-success" onclick="exportStokByWarehouse('ho')">📥 Stok HO</button>
+            <button class="btn btn-success" onclick="exportStokByWarehouse('agen')">📥 Stok AGEN</button>
+            <button class="btn btn-success" onclick="exportStokByWarehouse('return')">📥 Stok RETURN</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Grafik / Analytics -->
@@ -2406,7 +2429,8 @@ function showPanel(dash) {
     opname: 'panelOpname',
     master: 'panelMaster',
     input: 'panelInput',
-    users: 'panelUsers'
+    users: 'panelUsers',
+    downloads: 'panelDownloads'
   };
   document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
   const panelId = panels[dash];
@@ -2421,9 +2445,9 @@ function showPanel(dash) {
 
   if (kpiRow) kpiRow.style.display = isMainWarehouse ? 'grid' : 'none';
   if (chartsSection) chartsSection.style.display = isMainWarehouse ? 'block' : 'none';
-  if (exportLogPanel) exportLogPanel.style.display = isMainWarehouse ? 'flex' : 'none';
+  if (exportLogPanel) exportLogPanel.style.display = dash === 'downloads' ? 'flex' : 'none';
   const exportStokPanelEl = document.getElementById('exportStokPanel');
-  if (exportStokPanelEl) exportStokPanelEl.style.display = isMainWarehouse ? 'flex' : 'none';
+  if (exportStokPanelEl) exportStokPanelEl.style.display = dash === 'downloads' ? 'flex' : 'none';
 }
 
 function renderKPIs() {
@@ -2464,7 +2488,7 @@ function renderTabs() {
   const exportPanel = document.getElementById('exportLogPanel');
   if (!tabBar) return;
 
-  const nonStandardDashboards = ['grafik', 'gerai', 'audit', 'stok_harian', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  const nonStandardDashboards = ['grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonStandardDashboards.includes(activeDash)) {
     tabBar.style.display = 'none';
     if (exportPanel) exportPanel.style.display = 'none';
@@ -2474,9 +2498,9 @@ function renderTabs() {
     return;
   } else {
     tabBar.style.display = 'flex';
-    if (exportPanel) exportPanel.style.display = 'flex';
+    if (exportPanel) exportPanel.style.display = 'none';
     const stokPanelEl = document.getElementById('exportStokPanel');
-    if (stokPanelEl) stokPanelEl.style.display = 'flex';
+    if (stokPanelEl) stokPanelEl.style.display = 'none';
   }
 
   let tabs = [];
@@ -3087,7 +3111,7 @@ function renderContent() {
   
   if (!container) return;
 
-  const nonTableDashboards = ['grafik', 'gerai', 'audit', 'stok_harian', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  const nonTableDashboards = ['grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonTableDashboards.includes(activeDash)) {
     container.innerHTML = '';
     if (tableToolbarSection) tableToolbarSection.classList.add('hidden');
@@ -3406,9 +3430,15 @@ function exportLogByWarehouse(warehouse) {
 // Jika filter tanggal tabel stok sedang aktif, hasil download otomatis mengikuti periode tersebut.
 function exportStokByWarehouse(key) {
   const label = key.toUpperCase();
-  const fStartVal = document.getElementById('tableFilterStart')?.value || '';
-  const fEndVal = document.getElementById('tableFilterEnd')?.value || '';
-  const periodMode = tableDateFilterTouched && (fStartVal || fEndVal);
+  // Filter periode khusus dari Dashboard Download (kosong = total berjalan)
+  const fStartVal = document.getElementById('stockExportStart')?.value || '';
+  const fEndVal = document.getElementById('stockExportEnd')?.value || '';
+  const periodMode = !!(fStartVal || fEndVal);
+
+  if (fStartVal && fEndVal && fStartVal > fEndVal) {
+    showToast('Tanggal mulai rekap stok tidak boleh melebihi tanggal selesai!', 'error');
+    return;
+  }
 
   const rows = periodMode ? getStockRowsForPeriod(key, fStartVal, fEndVal) : (data[key] || []);
 
