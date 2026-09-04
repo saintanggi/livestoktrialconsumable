@@ -791,7 +791,7 @@
 
       <!-- KATEGORI 1: UPLOAD TRANSAKSI BARU -->
       <div class="upload-section" id="uploadSecTrx">
-        <p>Format Kolom Excel: Tanggal | Ticket | Kode | Jenis(in/out) | QTY | Gerai | Keterangan</p>
+        <p>Format Kolom Excel: Tanggal | Ticket (boleh kosong, dibuat otomatis) | Kode | Jenis(in/out) | QTY | Gerai | Keterangan</p>
         <div class="flex" style="margin-top: 10px;">
           <label class="btn" style="cursor:pointer;">
             📂 Pilih File Excel
@@ -2805,13 +2805,23 @@ async function confirmRestoreBackup(){
 }
 
 // ===== PREVIEW & VALIDASI UPLOAD MASSAL =====
+// Ticket kosong dibuat otomatis berdasarkan jenis, tanggal, dan urutan agar
+// preview dan penyimpanan menghasilkan nomor yang sama. Prefix IN/OUT dibedakan.
+function generateBulkTicket(jenis, tanggal, sequence) {
+  const type = String(jenis || '').toLowerCase() === 'in' ? 'IN' : 'OUT';
+  const iso = String(tanggal || new Date().toISOString().split('T')[0]);
+  const parts = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  // Format sederhana: IN/OUT + DDMMYY + nomor urut 2 digit.
+  const datePart = parts ? `${parts[3]}${parts[2]}${parts[1].slice(-2)}` : iso.replace(/[^0-9]/g, '').slice(-6);
+  return `${type}${datePart}${String(sequence).padStart(2, '0')}`;
+}
 let bulkPreviewApprovedSignature='';
 function bulkFileSignature(file){return file?`${file.name}|${file.size}|${file.lastModified}`:'';}
 function previewBulkUpload(){
   const input=document.getElementById('fileUpload'),file=input?.files?.[0],box=document.getElementById('bulkPreviewBox');
   if(!file||!box){showToast('Pilih file Excel dulu!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
-  bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0;const seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=Number(r[4])||0,ticket=String(r[1]||'').trim(),tglRaw=r[0],m=data.master.find(x=>x.kode===kode);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!ticket)reason.push('Ticket kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const tgl=excelDateToISO(tglRaw),key=`${tgl}|${ticket}|${kode}`;if(seen.has(key)||data.logs.some(l=>formatYMD(l.tanggal)===tgl&&String(l.ticket).trim()===ticket&&String(l.kode).trim()===kode))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
-  box.classList.remove('hidden');box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'crit':'ok'}">Potensi stok negatif: ${negative}</span></div>${invalid.length?`<div style="font-size:10px;color:#fca5a5;max-height:90px;overflow:auto;">${invalid.slice(0,20).map(x=>`Baris ${x.baris}: ${x.reason}`).join('<br>')}</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;}catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${err.message}</span>`;}};reader.readAsArrayBuffer(file);
+  bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0,autoTicketCount=0;const autoSeq={},seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=Number(r[4])||0,tglRaw=r[0],m=data.master.find(x=>x.kode===kode);const tgl=tglRaw?excelDateToISO(tglRaw):'';const manualTicket=String(r[1]??'').trim();const autoType=jenis==='in'?'IN':'OUT';const autoKey=`${autoType}|${tgl}`;if(!manualTicket){autoSeq[autoKey]=(autoSeq[autoKey]||0)+1;autoTicketCount++;}const ticket=manualTicket||generateBulkTicket(jenis,tgl,autoSeq[autoKey]);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const key=`${tgl}|${ticket}|${kode}`;if(seen.has(key)||data.logs.some(l=>formatYMD(l.tanggal)===tgl&&String(l.ticket).trim()===ticket&&String(l.kode).trim()===kode))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
+  box.classList.remove('hidden');box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge ok">Ticket otomatis: ${autoTicketCount}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'crit':'ok'}">Potensi stok negatif: ${negative}</span></div>${invalid.length?`<div style="font-size:10px;color:#fca5a5;max-height:90px;overflow:auto;">${invalid.slice(0,20).map(x=>`Baris ${x.baris}: ${x.reason}`).join('<br>')}</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;}catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${err.message}</span>`;}};reader.readAsArrayBuffer(file);
 }
 function approveBulkPreview(){const file=document.getElementById('fileUpload')?.files?.[0];if(!file)return;bulkPreviewApprovedSignature=bulkFileSignature(file);processBulk();}
 
@@ -4884,21 +4894,27 @@ async function processBulk() {
       let duplicateCount = 0;
 
       let replaceCount = 0;
+      const autoTicketSeq = {};
 
       for (let i = 1; i < json.length; i++) {
         const r = json[i];
         if (!r || r.length < 5) continue;
         const tgl = excelDateToISO(r[0]);
-        const ticket = r[1] ? String(r[1]).trim() : 'BULK-' + Date.now().toString().slice(-6);
         const kode = String(r[2] || '').trim();
-        const jenis = String(r[3] || 'out').toLowerCase();
+        const jenis = String(r[3] || 'out').trim().toLowerCase();
+        // Jika ticket Excel kosong, generate otomatis dengan prefix IN atau OUT.
+        const manualTicket = r[1] === undefined || r[1] === null ? '' : String(r[1]).trim();
+        const autoType = jenis === 'in' ? 'IN' : 'OUT';
+        const autoKey = `${autoType}|${tgl}`;
+        if (!manualTicket) autoTicketSeq[autoKey] = (autoTicketSeq[autoKey] || 0) + 1;
+        const ticket = manualTicket || generateBulkTicket(jenis, tgl, autoTicketSeq[autoKey]);
         const qty = Number(r[4]) || 0;
         const gerai = String(r[5] || 'Gerai Utama');
         // Jika kolom keterangan di Excel kosong, biarkan kosong ('-') — jangan diisi otomatis 'Upload Massal'
         const ketRaw = (r[6] === undefined || r[6] === null) ? '' : String(r[6]).trim();
         const ket = ketRaw !== '' ? ketRaw : '-';
 
-        if (!r[0] || !r[1] || !kode || qty <= 0 || !['in', 'out'].includes(jenis)) continue;
+        if (!r[0] || !kode || qty <= 0 || !['in', 'out'].includes(jenis)) continue;
 
         const master = data.master.find(m => m.kode === kode);
         if (!master) continue;
