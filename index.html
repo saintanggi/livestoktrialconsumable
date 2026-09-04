@@ -344,16 +344,9 @@
   
   .footer { text-align: center; padding: 16px; color: #a29dbd; font-size: 12px; border-top: 1px solid #23203f; margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
-  /* ===== RESPONSIVE MOBILE + GLOBAL FILTER ===== */
+  /* ===== RESPONSIVE MOBILE ===== */
   .mobile-menu-btn { display:none; }
   .mobile-sidebar-overlay { display:none; }
-  .global-filter-panel { background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.06)); border:1px solid #302852; border-radius:16px; padding:12px 14px; margin-bottom:16px; }
-  .global-filter-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
-  .global-filter-grid { display:grid; grid-template-columns:repeat(5,minmax(125px,1fr)) auto; gap:8px; align-items:end; }
-  .global-filter-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
-  .global-filter-field label { font-size:9px; color:#a29dbd; font-weight:800; letter-spacing:.7px; text-transform:uppercase; }
-  .global-filter-field input,.global-filter-field select { width:100%; min-width:0; padding:8px 9px; border:1px solid #302852; border-radius:9px; background:#0c0a18; color:#e9e7f2; font:11px Inter,sans-serif; }
-  .global-filter-active { font-size:10px; color:#4ade80; display:none; }
   @media(max-width:900px){
     body { display:block !important; min-height:100vh; }
     .sidebar { position:fixed !important; left:-290px !important; top:0; width:280px !important; height:100dvh !important; z-index:3000 !important; padding:14px !important; border-right:1px solid #39305d !important; transition:left .25s ease; box-shadow:18px 0 45px rgba(0,0,0,.55); }
@@ -367,10 +360,6 @@
     .topbar .search-box input { width:100%; min-width:0 !important; }
     .wrap { width:100%; min-width:0; }
     .panel { padding:14px !important; border-radius:14px !important; margin-bottom:12px !important; }
-    .global-filter-panel { padding:10px; border-radius:13px; }
-    .global-filter-head { align-items:flex-start; }
-    .global-filter-grid { grid-template-columns:1fr 1fr; }
-    .global-filter-grid .btn { width:100%; }
     .kpi-row { grid-template-columns:1fr 1fr !important; gap:8px !important; margin-bottom:10px !important; }
     .kpi { padding:12px !important; min-width:0; border-radius:12px !important; }
     .kpi .value { font-size:20px !important; overflow-wrap:anywhere; }
@@ -403,7 +392,6 @@
     .toast { left:10px; right:10px; bottom:10px; max-width:none; text-align:center; }
   }
   @media(max-width:520px){
-    .global-filter-grid { grid-template-columns:1fr; }
     .kpi-row { grid-template-columns:1fr !important; }
     .topbar-title-long { display:none; }
     .btn { min-height:40px; }
@@ -504,22 +492,6 @@
   <div class="wrap">
 
 
-    <!-- FILTER GLOBAL KONSISTEN -->
-    <div class="global-filter-panel" id="globalFilterPanel">
-      <div class="global-filter-head">
-        <div><b style="font-size:12px;color:#ddd6fe;">🎛️ Filter Global</b> <span id="globalFilterActive" class="global-filter-active">● AKTIF</span><div style="font-size:9px;color:#77718f;margin-top:2px;">Berlaku pada ringkasan, tabel stok/log, prediksi, rekomendasi, dan hasil download.</div></div>
-        <button class="btn" style="padding:6px 9px;font-size:10px;" onclick="toggleGlobalFilter()" id="globalFilterToggle">Sembunyikan</button>
-      </div>
-      <div class="global-filter-grid" id="globalFilterGrid">
-        <div class="global-filter-field"><label>Tanggal Mulai</label><input type="date" id="globalFilterStart" onchange="applyGlobalFilters()"></div>
-        <div class="global-filter-field"><label>Tanggal Selesai</label><input type="date" id="globalFilterEnd" onchange="applyGlobalFilters()"></div>
-        <div class="global-filter-field"><label>Gudang</label><select id="globalFilterWarehouse" onchange="applyGlobalFilters()"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option></select></div>
-        <div class="global-filter-field"><label>Status Stok</label><select id="globalFilterStatus" onchange="applyGlobalFilters()"><option value="ALL">Semua Status</option><option value="crit">Kritis</option><option value="warn">Waspada</option><option value="ok">Aman</option></select></div>
-        <div class="global-filter-field"><label>Gerai</label><select id="globalFilterGerai" onchange="applyGlobalFilters()"><option value="ALL">Semua Gerai</option></select></div>
-        <button class="btn btn-danger" onclick="resetGlobalFilters()" style="padding:8px 11px;font-size:11px;">Reset Filter</button>
-      </div>
-    </div>
-
 
 
 
@@ -546,7 +518,7 @@
     <div class="panel hidden" id="panelForecast">
       <div style="background:linear-gradient(135deg,rgba(124,58,237,.20),rgba(6,182,212,.10));border:1px solid #7c3aed55;border-radius:16px;padding:20px;margin-bottom:14px;">
         <h3 style="margin:0 0 5px;">🔮 Prediksi Stok Habis</h3>
-        <p style="margin:0;color:#a29dbd;font-size:12px;">Estimasi berdasarkan rata-rata transaksi OUT 30 hari terakhir atau periode Filter Global yang dipilih. Hasil prediksi bersifat rekomendasi dan tidak mengubah stok.</p>
+        <p style="margin:0;color:#a29dbd;font-size:12px;">Estimasi berdasarkan rata-rata transaksi OUT selama 30 hari terakhir. Hasil prediksi bersifat rekomendasi dan tidak mengubah stok.</p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
         <select id="forecastWarehouse" onchange="renderForecastDashboard()" style="max-width:170px;"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option></select>
@@ -2682,29 +2654,26 @@ function renderDiagnostics(d){
 function downloadDiagnosticsReport(){const d=latestDiagnostics||JSON.parse(localStorage.getItem('livestock_last_diagnostics')||'null');if(!d){showToast('Jalankan pemeriksaan terlebih dahulu!','error');return;}downloadBlob(JSON.stringify(d,null,2),`Status_Sistem_${new Date().toISOString().replace(/[:.]/g,'-')}.json`,'application/json');}
 
 
-// ===== FILTER GLOBAL KONSISTEN + NAVIGASI MOBILE =====
+// ===== MODE TANPA FILTER GLOBAL + NAVIGASI MOBILE =====
+// Helper kompatibilitas dipertahankan agar dashboard lama tetap stabil,
+// tetapi selalu mengembalikan seluruh data tanpa penyaringan global.
 function getGlobalFilters(){
-  return {
-    start:document.getElementById('globalFilterStart')?.value||'',
-    end:document.getElementById('globalFilterEnd')?.value||'',
-    warehouse:document.getElementById('globalFilterWarehouse')?.value||'ALL',
-    status:document.getElementById('globalFilterStatus')?.value||'ALL',
-    gerai:document.getElementById('globalFilterGerai')?.value||'ALL'
-  };
+  return { start:'', end:'', warehouse:'ALL', status:'ALL', gerai:'ALL' };
 }
-function globalFilterIsActive(){const f=getGlobalFilters();return !!(f.start||f.end||f.warehouse!=='ALL'||f.status!=='ALL'||f.gerai!=='ALL');}
-function stockStatusForLog(log){const stat=getNormalizedStatus(log.status),arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;return arr.find(x=>x.kode===log.kode)?.status||'ok';}
-function logPassesGlobalFilter(log,ignoreDates=false){const f=getGlobalFilters(),d=formatYMD(log.tanggal),wh=getNormalizedStatus(log.status);if(!ignoreDates&&f.start&&d<f.start)return false;if(!ignoreDates&&f.end&&d>f.end)return false;if(f.warehouse!=='ALL'&&wh!==f.warehouse)return false;if(f.gerai!=='ALL'&&String(log.gerai||'')!==f.gerai)return false;if(f.status!=='ALL'&&stockStatusForLog(log)!==f.status)return false;return true;}
-function applyGlobalStockFilter(rows,gudang){const f=getGlobalFilters();let out=rows;if(f.warehouse!=='ALL'&&gudang&&f.warehouse!==gudang)return [];if(f.status!=='ALL')out=out.filter(r=>(r.status||statusBadge(r.buffer,r.akhir))===f.status);if(f.gerai!=='ALL'){const codes=new Set((data.logs||[]).filter(l=>logPassesGlobalFilter(l)).map(l=>l.kode));out=out.filter(r=>codes.has(r.kode));}return out;}
-function populateGlobalGerai(){const sel=document.getElementById('globalFilterGerai');if(!sel)return;const old=sel.value;sel.innerHTML='<option value="ALL">Semua Gerai</option>'+[...new Set(data.gerai||[])].map(g=>`<option value="${String(g).replace(/"/g,'&quot;')}">${g}</option>`).join('');if([...sel.options].some(o=>o.value===old))sel.value=old;}
-function saveGlobalFilterState(){try{localStorage.setItem('livestock_global_filter',JSON.stringify(getGlobalFilters()));}catch(e){}}
-function loadGlobalFilterState(){try{const f=JSON.parse(localStorage.getItem('livestock_global_filter')||'{}');[['globalFilterStart',f.start],['globalFilterEnd',f.end],['globalFilterWarehouse',f.warehouse],['globalFilterStatus',f.status],['globalFilterGerai',f.gerai]].forEach(([id,v])=>{const el=document.getElementById(id);if(el&&v!=null)el.value=v;});}catch(e){}updateGlobalFilterIndicator();}
-function updateGlobalFilterIndicator(){const el=document.getElementById('globalFilterActive');if(el)el.style.display=globalFilterIsActive()?'inline':'none';}
-function applyGlobalFilters(){const f=getGlobalFilters();if(f.start&&f.end&&f.start>f.end){showToast('Tanggal mulai filter global tidak boleh melebihi tanggal selesai!','error');return;}saveGlobalFilterState();updateGlobalFilterIndicator();currentPage=1;if(activeDash==='home')renderExecutiveDashboard();else if(activeDash==='forecast')renderForecastDashboard();else if(activeDash==='po_recommendation')renderPoRecommendation();else refreshAll();}
-function resetGlobalFilters(){['globalFilterStart','globalFilterEnd'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['globalFilterWarehouse','globalFilterStatus','globalFilterGerai'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='ALL';});applyGlobalFilters();showToast('Filter global dikembalikan ke Semua Data.','success');}
-function toggleGlobalFilter(){const grid=document.getElementById('globalFilterGrid'),btn=document.getElementById('globalFilterToggle');if(!grid)return;const hidden=grid.style.display==='none';grid.style.display=hidden?'grid':'none';if(btn)btn.textContent=hidden?'Sembunyikan':'Tampilkan';}
-function toggleMobileMenu(force){const open=typeof force==='boolean'?force:!document.body.classList.contains('mobile-menu-open');document.body.classList.toggle('mobile-menu-open',open);}
-
+function globalFilterIsActive(){ return false; }
+function logPassesGlobalFilter(){ return true; }
+function applyGlobalStockFilter(rows){ return rows || []; }
+function populateGlobalGerai(){}
+function saveGlobalFilterState(){}
+function loadGlobalFilterState(){ try { localStorage.removeItem('livestock_global_filter'); } catch(e) {} }
+function updateGlobalFilterIndicator(){}
+function applyGlobalFilters(){ refreshAll(); }
+function resetGlobalFilters(){ refreshAll(); }
+function toggleGlobalFilter(){}
+function toggleMobileMenu(force){
+  const open=typeof force==='boolean'?force:!document.body.classList.contains('mobile-menu-open');
+  document.body.classList.toggle('mobile-menu-open',open);
+}
 
 // ===== FITUR ANALITIK TAMBAHAN: PREDIKSI 30 HARI, BERANDA, PO, BACKUP =====
 const FORECAST_WINDOW_DAYS = 30;
@@ -3397,7 +3366,7 @@ function renderGlobalGrafikDashboard() {
     // 2. CHART 2: Tren Transaksi Harian (Hanya Kritis/Waspada)
     let dailyMap = {};
     (data.logs || []).forEach(l => {
-      if (!atRiskCodes.has(l.kode) || !logPassesGlobalFilter(l)) return; // Mengikuti filter global barang berstatus kritis/waspada!
+      if (!atRiskCodes.has(l.kode) || !logPassesGlobalFilter(l)) return; // Hanya barang berstatus kritis/waspada!
       let dStr = formatYMD(l.tanggal);
       if (!dailyMap[dStr]) dailyMap[dStr] = { in: 0, out: 0 };
       dailyMap[dStr].in += num(l.in);
@@ -3452,7 +3421,7 @@ function renderGlobalGrafikDashboard() {
     // 3. CHART 3: Top 10 Produk Kritis/Waspada (Pergerakan Terbanyak)
     let productMovementMap = {};
     (data.logs || []).forEach(l => {
-      if (!atRiskCodes.has(l.kode) || !logPassesGlobalFilter(l)) return; // Mengikuti filter global barang berstatus kritis/waspada!
+      if (!atRiskCodes.has(l.kode) || !logPassesGlobalFilter(l)) return; // Hanya barang berstatus kritis/waspada!
       let pName = l.item || l.kode || 'Unknown';
       let totalQty = num(l.in) + num(l.out);
       productMovementMap[pName] = (productMovementMap[pName] || 0) + totalQty;
@@ -5872,12 +5841,6 @@ document.addEventListener('DOMContentLoaded', function() {
   recalculateStok();
   populateGlobalGerai();
   loadGlobalFilterState();
-  if (window.innerWidth <= 900) {
-    const gfGrid = document.getElementById('globalFilterGrid');
-    const gfToggle = document.getElementById('globalFilterToggle');
-    if (gfGrid) gfGrid.style.display = 'none';
-    if (gfToggle) gfToggle.textContent = 'Tampilkan';
-  }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleMobileMenu(false); });
   window.addEventListener('error', e => recordSystemError(e.message || 'Unknown error', 'window'));
   window.addEventListener('unhandledrejection', e => recordSystemError(e.reason?.message || e.reason || 'Unhandled rejection', 'promise'));
