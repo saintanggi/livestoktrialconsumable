@@ -423,7 +423,6 @@
       <button class="dash-btn" data-dash="agen">🏪 AGEN</button>
       <button class="dash-btn" data-dash="return">📦 RETURN</button>
       <button class="dash-btn auth-btn" data-dash="po" style="display:none; color:#58a6ff; border-color:#58a6ff55;">📄 PO & Penerimaan</button>
-      <button class="dash-btn" data-dash="stok_harian">📅 Stok Harian</button>
       <button class="dash-btn" data-dash="forecast" style="color:#c084fc;border-color:#7c3aed55;">🔮 Prediksi Stok</button>
       <button class="dash-btn" data-dash="po_recommendation" style="color:#fbbf24;border-color:#f2a93b55;">🧮 Rekomendasi PO</button>
       <button class="dash-btn" data-dash="downloads" style="background:#22c55e12; color:#4ade80; border-color:#22c55e44;">📥 Download & Rekap</button>
@@ -740,27 +739,6 @@
       <p>Catatan riwayat perubahan master barang, penghapusan, dan aktivitas penting untuk keamanan dan akuntabilitas staf.</p>
     </div>
 
-    <div class="panel hidden" id="panelStokHarian">
-      <h3>📅 Laporan Stok Harian</h3>
-      <div class="form-grid">
-        <div class="form-group"><label>Dari Tanggal</label><input type="date" id="filterStart" value="2026-08-01"></div>
-        <div class="form-group"><label>Sampai Tanggal</label><input type="date" id="filterEnd" value="2026-08-04"></div>
-        <div class="form-group"><label>Gudang</label>
-          <select id="filterGudang">
-            <option value="ALL">Semua</option>
-            <option value="HO">HO</option>
-            <option value="AGEN">AGEN</option>
-            <option value="RETURN">RETURN</option>
-          </select>
-        </div>
-        <div class="form-group" style="flex-direction:row; align-items:flex-end; gap:6px;">
-          <button class="btn btn-primary" onclick="renderStokHarian()">Tampilkan</button>
-          <button class="btn btn-success" onclick="exportStokHarian()">📥 Excel</button>
-          <button class="btn auth-btn" onclick="syncReportToGAS()" style="display:none; color:#58a6ff; border-color:#58a6ff; background:#58a6ff1a;">☁️ Simpan ke Cloud</button>
-        </div>
-      </div>
-    </div>
-
     <div class="panel hidden" id="panelTransfer">
       <h3>🔄 Transfer Stok Antar Gudang</h3>
       <div class="form-grid">
@@ -941,7 +919,7 @@
     <div class="panel hidden" id="panelDownloads">
       <div style="background:linear-gradient(135deg,rgba(34,197,94,.14),rgba(124,58,237,.10)); border:1px solid rgba(74,222,128,.24); border-radius:16px; padding:20px; margin-bottom:16px;">
         <h3 style="margin:0 0 6px; color:#f5f3ff;">📥 Dashboard Download & Rekap</h3>
-        <p style="margin:0; color:#a29dbd; font-size:12px;">Pusat unduhan khusus untuk Log Transaksi dan Rekap Stok HO, AGEN, serta RETURN.</p>
+        <p style="margin:0; color:#a29dbd; font-size:12px;">Pusat unduhan Log Transaksi, Rekap Stok, dan Laporan Stok Harian dalam satu dashboard.</p>
       </div>
 
       <!-- DOWNLOAD LOG TRANSAKSI -->
@@ -977,6 +955,30 @@
             <button class="btn btn-success" onclick="exportStokByWarehouse('agen')">📥 Stok AGEN</button>
             <button class="btn btn-success" onclick="exportStokByWarehouse('return')">📥 Stok RETURN</button>
             <button class="btn btn-primary" onclick="exportAllStockWorkbook()">📚 Semua Stok (3 Sheet)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOWNLOAD / LAPORAN STOK HARIAN -->
+      <div class="export-panel" id="downloadStokHarianPanel" style="display:flex; border-radius:16px; padding:18px; margin-top:14px; background:linear-gradient(135deg,#15182b,#12101f); border-color:#06b6d444;">
+        <div style="width:100%;">
+          <div style="font-size:14px; font-weight:800; color:#67e8f9; margin-bottom:4px;">📅 Laporan &amp; Download Stok Harian</div>
+          <div style="font-size:11px; color:#8b86a7; margin-bottom:12px;">Pilih periode dan gudang untuk melihat atau mengunduh laporan stok harian.</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Dari Tanggal</label><input type="date" id="filterStart" value="2026-08-01"></div>
+            <div class="form-group"><label>Sampai Tanggal</label><input type="date" id="filterEnd" value="2026-08-04"></div>
+            <div class="form-group"><label>Gudang</label>
+              <select id="filterGudang">
+                <option value="ALL">Semua</option>
+                <option value="HO">HO</option>
+                <option value="AGEN">AGEN</option>
+                <option value="RETURN">RETURN</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex-direction:row; align-items:flex-end; gap:6px; flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="renderStokHarian()">👁️ Tampilkan</button>
+              <button class="btn btn-success" onclick="exportStokHarian()">📥 Excel Stok Harian</button>
+            </div>
           </div>
         </div>
       </div>
@@ -2837,7 +2839,6 @@ function showPanel(dash) {
     gerai: 'panelGerai',
     audit: 'panelAudit',
     po: 'panelPO',
-    stok_harian: 'panelStokHarian',
     transfer: 'panelTransfer',
     upload: 'panelUpload',
     opname: 'panelOpname',
@@ -2904,7 +2905,7 @@ function renderTabs() {
   const exportPanel = document.getElementById('exportLogPanel');
   if (!tabBar) return;
 
-  const nonStandardDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'system_status', 'grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  const nonStandardDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'system_status', 'grafik', 'gerai', 'audit', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonStandardDashboards.includes(activeDash)) {
     tabBar.style.display = 'none';
     if (exportPanel) exportPanel.style.display = 'none';
@@ -3532,7 +3533,7 @@ function renderContent() {
   
   if (!container) return;
 
-  const nonTableDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'system_status', 'grafik', 'gerai', 'audit', 'stok_harian', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
+  const nonTableDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'system_status', 'grafik', 'gerai', 'audit', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonTableDashboards.includes(activeDash)) {
     container.innerHTML = '';
     if (tableToolbarSection) tableToolbarSection.classList.add('hidden');
@@ -5929,18 +5930,6 @@ document.addEventListener('DOMContentLoaded', function() {
         activeTab = 'audit_list';
         showPanel(dash);
         renderContent();
-        return;
-      }
-
-      if (dash === 'stok_harian') {
-        activeTab = 'stok_harian';
-        showPanel(dash);
-        // Pastikan toolbar pencarian tetap terlihat untuk memfilter stok harian
-        const toolbar = document.getElementById('tableToolbarSection');
-        if (toolbar) toolbar.classList.remove('hidden');
-        const dateFilterBox = document.getElementById('tableDateFilterContainer');
-        if (dateFilterBox) dateFilterBox.style.display = 'none'; // Sembunyikan filter tanggal tabel, gunakan filter harian atas
-        renderStokHarian(true);
         return;
       }
 
