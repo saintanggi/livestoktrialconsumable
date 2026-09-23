@@ -397,6 +397,15 @@
     .btn { min-height:40px; }
   }
 
+
+  /* Kartu Ringkasan Eksekutif dapat diklik tanpa mengubah perhitungan data */
+  .executive-clickable { cursor: pointer; position: relative; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+  .executive-clickable:hover { transform: translateY(-3px); border-color: #8b5cf688 !important; box-shadow: 0 10px 28px rgba(124,58,237,.24); }
+  .executive-clickable:focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
+  .executive-clickable::after { content: 'Buka →'; position: absolute; right: 12px; bottom: 7px; font-size: 9px; font-weight: 800; color: rgba(255,255,255,.68); opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .executive-clickable:hover::after, .executive-clickable:focus-visible::after { opacity: 1; }
+  @media(max-width:900px) { .executive-clickable::after { opacity:.65; } }
+
 </style>
 </head>
 <body>
@@ -2732,6 +2741,45 @@ function forecastBadge(row) {
   return `<span class="badge ok">${row.daysToEmpty} hari</span>`;
 }
 
+
+// Navigasi aman dari kartu Ringkasan Eksekutif ke dashboard terkait.
+function openExecutiveCard(target) {
+  const routeMap = {
+    total: { dash: 'grafik', anchor: 'panelGrafik', message: 'Membuka Grafik Global' },
+    risk: { dash: 'grafik', anchor: 'globalRiskTableBody', message: 'Membuka daftar stok Kritis & Waspada' },
+    movement: { dash: 'downloads', anchor: 'exportLogPanel', message: 'Membuka Download Log Transaksi hari ini' },
+    forecast: { dash: 'forecast', anchor: 'forecastTable', message: 'Membuka Prediksi Stok Habis' },
+    activity: { dash: 'downloads', anchor: 'exportLogPanel', message: 'Membuka Download Log Transaksi' }
+  };
+  const route = routeMap[target];
+  if (!route) return;
+  const menuButton = document.querySelector(`.dash-btn[data-dash="${route.dash}"]`);
+  if (!menuButton) { showToast('Menu tujuan tidak ditemukan.', 'error'); return; }
+  menuButton.click();
+
+  // Untuk kartu IN/OUT hari ini, isi periode download dengan tanggal hari ini.
+  if (target === 'movement') {
+    const today = new Date().toISOString().split('T')[0];
+    const start = document.getElementById('exportStart');
+    const end = document.getElementById('exportEnd');
+    if (start) start.value = today;
+    if (end) end.value = today;
+  }
+
+  setTimeout(() => {
+    const anchor = document.getElementById(route.anchor);
+    const destination = route.anchor === 'globalRiskTableBody' ? anchor?.closest('.chart-card') : anchor;
+    destination?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 180);
+  showToast('✅ ' + route.message, 'success');
+}
+function executiveCardKey(event, target) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openExecutiveCard(target);
+  }
+}
+
 function renderExecutiveDashboard() {
   const el = document.getElementById('executiveDashboardContent'); if (!el) return;
   const gf=getGlobalFilters(); let rows=[]; [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,gudang])=>{const source=(gf.start||gf.end)?getStockRowsForPeriod(key,gf.start,gf.end):(data[key]||[]);source.forEach(r=>rows.push(Object.assign({},r,{gudang})));}); rows=applyGlobalStockFilter(rows,null).filter(r=>gf.warehouse==='ALL'||r.gudang===gf.warehouse); const forecasts=getForecastRows().filter(r=>(gf.warehouse==='ALL'||r.gudang===gf.warehouse)&&(gf.status==='ALL'||r.status===gf.status));
@@ -2745,13 +2793,13 @@ function renderExecutiveDashboard() {
   el.innerHTML=`
     <div style="background:linear-gradient(135deg,#21163f,#101827);border:1px solid #7c3aed55;border-radius:16px;padding:20px;margin-bottom:14px;"><h3 style="margin:0 0 5px;">🏠 Ringkasan Eksekutif</h3><p style="margin:0;color:#a29dbd;font-size:12px;">Kondisi seluruh gudang dalam satu tampilan. Data hanya dibaca, tidak mengubah transaksi.</p></div>
     <div class="kpi-row" style="display:grid;margin-bottom:14px;">
-      <div class="kpi"><div class="kpi-info"><span class="label">Total Stok Global</span><span class="value">${fmt(totalStock)}</span></div><div class="kpi-icon">📦</div></div>
-      <div class="kpi"><div class="kpi-info"><span class="label">Kritis / Waspada</span><span class="value">${crit} / ${warn}</span></div><div class="kpi-icon">⚠️</div></div>
-      <div class="kpi"><div class="kpi-info"><span class="label">IN / OUT Hari Ini</span><span class="value" style="font-size:20px;">+${fmt(inToday)} / -${fmt(outToday)}</span></div><div class="kpi-icon">↔️</div></div>
+      <div class="kpi executive-clickable" role="button" tabindex="0" aria-label="Buka Grafik Total Stok Global" onclick="openExecutiveCard('total')" onkeydown="executiveCardKey(event,'total')"><div class="kpi-info"><span class="label">Total Stok Global</span><span class="value">${fmt(totalStock)}</span></div><div class="kpi-icon">📦</div></div>
+      <div class="kpi executive-clickable" role="button" tabindex="0" aria-label="Buka daftar stok Kritis dan Waspada" onclick="openExecutiveCard('risk')" onkeydown="executiveCardKey(event,'risk')"><div class="kpi-info"><span class="label">Kritis / Waspada</span><span class="value">${crit} / ${warn}</span></div><div class="kpi-icon">⚠️</div></div>
+      <div class="kpi executive-clickable" role="button" tabindex="0" aria-label="Buka transaksi masuk dan keluar hari ini" onclick="openExecutiveCard('movement')" onkeydown="executiveCardKey(event,'movement')"><div class="kpi-info"><span class="label">IN / OUT Hari Ini</span><span class="value" style="font-size:20px;">+${fmt(inToday)} / -${fmt(outToday)}</span></div><div class="kpi-icon">↔️</div></div>
     </div>
     <div class="analytics-grid" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr));">
-      <div class="chart-card" style="align-items:stretch;"><h4>🚨 Prediksi Habis ≤ 7 Hari</h4><div class="scroll" style="max-height:300px;"><table><thead><tr><th>Gudang</th><th>Barang</th><th>Stok</th><th>Estimasi</th></tr></thead><tbody>${urgent.length?urgent.map(r=>`<tr><td>${r.gudang}</td><td>${r.item}</td><td class="text-right">${fmt(r.stock)}</td><td>${forecastBadge(r)}</td></tr>`).join(''):'<tr><td colspan="4" class="text-center text-muted">Tidak ada prediksi mendesak</td></tr>'}</tbody></table></div></div>
-      <div class="chart-card" style="align-items:stretch;"><h4>🕘 Aktivitas Terbaru</h4><div class="scroll" style="max-height:300px;"><table><thead><tr><th>Tanggal</th><th>Gudang</th><th>Barang</th><th>IN/OUT</th></tr></thead><tbody>${recent.map(l=>`<tr><td>${formatDateSimple(l.tanggal)}</td><td>${getNormalizedStatus(l.status)}</td><td>${l.item}</td><td>${num(l.in)>0?'+'+fmt(num(l.in)):'-'+fmt(num(l.out))}</td></tr>`).join('')}</tbody></table></div></div>
+      <div class="chart-card executive-clickable" role="button" tabindex="0" aria-label="Buka Prediksi Stok Habis" onclick="openExecutiveCard('forecast')" onkeydown="executiveCardKey(event,'forecast')" style="align-items:stretch;"><h4>🚨 Prediksi Habis ≤ 7 Hari</h4><div class="scroll" style="max-height:300px;"><table><thead><tr><th>Gudang</th><th>Barang</th><th>Stok</th><th>Estimasi</th></tr></thead><tbody>${urgent.length?urgent.map(r=>`<tr><td>${r.gudang}</td><td>${r.item}</td><td class="text-right">${fmt(r.stock)}</td><td>${forecastBadge(r)}</td></tr>`).join(''):'<tr><td colspan="4" class="text-center text-muted">Tidak ada prediksi mendesak</td></tr>'}</tbody></table></div></div>
+      <div class="chart-card executive-clickable" role="button" tabindex="0" aria-label="Buka Download Log Transaksi" onclick="openExecutiveCard('activity')" onkeydown="executiveCardKey(event,'activity')" style="align-items:stretch;"><h4>🕘 Aktivitas Terbaru</h4><div class="scroll" style="max-height:300px;"><table><thead><tr><th>Tanggal</th><th>Gudang</th><th>Barang</th><th>IN/OUT</th></tr></thead><tbody>${recent.map(l=>`<tr><td>${formatDateSimple(l.tanggal)}</td><td>${getNormalizedStatus(l.status)}</td><td>${l.item}</td><td>${num(l.in)>0?'+'+fmt(num(l.in)):'-'+fmt(num(l.out))}</td></tr>`).join('')}</tbody></table></div></div>
     </div>`;
 }
 
