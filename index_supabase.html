@@ -406,6 +406,11 @@
   .executive-clickable:hover::after, .executive-clickable:focus-visible::after { opacity: 1; }
   @media(max-width:900px) { .executive-clickable::after { opacity:.65; } }
 
+
+  .log-summary-grid { display:grid; grid-template-columns:repeat(4,minmax(130px,1fr)); gap:8px; margin-bottom:10px; }
+  @media(max-width:700px) { .log-summary-grid { grid-template-columns:1fr 1fr; } }
+  @media(max-width:420px) { .log-summary-grid { grid-template-columns:1fr; } }
+
 </style>
 </head>
 <body>
@@ -1011,6 +1016,14 @@
           <span>s/d</span>
           <input type="date" id="tableFilterEnd" value="2026-08-04" onchange="currentPage=1; tableDateFilterTouched=true; renderContent()">
           <button class="btn" style="padding: 3px 6px; font-size: 10px;" onclick="resetTableDateFilter()">Reset</button>
+        </div>
+        <div class="date-filter-box" id="logTypeFilterContainer" style="display:none;">
+          <span>↔️ Jenis:</span>
+          <select id="logTypeFilter" onchange="currentPage=1; renderContent()" style="padding:4px 8px;border-radius:6px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:11px;">
+            <option value="ALL">Semua IN &amp; OUT</option>
+            <option value="IN">Hanya IN</option>
+            <option value="OUT">Hanya OUT</option>
+          </select>
         </div>
       </div>
       <div class="bulk-toolbar hidden" id="bulkToolbar" style="margin-bottom:0;">
@@ -3590,6 +3603,7 @@ function renderContent() {
   const tableToolbarSection = document.getElementById('tableToolbarSection');
   const toolbar = document.getElementById('bulkToolbar');
   const dateFilterBox = document.getElementById('tableDateFilterContainer');
+  const logTypeFilterBox = document.getElementById('logTypeFilterContainer');
   const paginationBar = document.querySelector('.pagination-bar');
   
   if (!container) return;
@@ -3597,6 +3611,7 @@ function renderContent() {
   const nonTableDashboards = ['home', 'forecast', 'po_recommendation', 'backup', 'system_status', 'grafik', 'gerai', 'audit', 'downloads', 'transfer', 'upload', 'opname', 'master', 'input', 'users'];
   if (nonTableDashboards.includes(activeDash)) {
     container.innerHTML = '';
+    if (logTypeFilterBox) logTypeFilterBox.style.display = 'none';
     if (tableToolbarSection) tableToolbarSection.classList.add('hidden');
     if (paginationBar) paginationBar.style.display = 'none';
     return;
@@ -3612,6 +3627,8 @@ function renderContent() {
       dateFilterBox.style.display = 'none';
     }
   }
+
+  if (logTypeFilterBox) logTypeFilterBox.style.display = isLogTab(activeTab) ? 'flex' : 'none';
 
   if (toolbar && !isLogTab(activeTab)) {
     toolbar.classList.add('hidden');
@@ -3724,7 +3741,12 @@ function renderContent() {
     }
   }
 
-  if (isLogTab(activeTab)) rows = rows.filter(r => logPassesGlobalFilter(r));
+  if (isLogTab(activeTab)) {
+    rows = rows.filter(r => logPassesGlobalFilter(r));
+    const logType = document.getElementById('logTypeFilter')?.value || 'ALL';
+    if (logType === 'IN') rows = rows.filter(r => num(r.in) > 0);
+    else if (logType === 'OUT') rows = rows.filter(r => num(r.out) > 0);
+  }
 
   const localSearch = (document.getElementById('localTableSearch')?.value || '').toLowerCase();
   if (localSearch) {
@@ -3746,6 +3768,21 @@ function renderContent() {
       }
       return match;
     });
+  }
+
+  if (isLogTab(activeTab)) {
+    const sumIn = rows.reduce((total, row) => total + num(row.in), 0);
+    const sumOut = rows.reduce((total, row) => total + num(row.out), 0);
+    const difference = sumIn - sumOut;
+    const selectedType = document.getElementById('logTypeFilter')?.value || 'ALL';
+    const typeText = selectedType === 'IN' ? 'HANYA IN' : selectedType === 'OUT' ? 'HANYA OUT' : 'SEMUA IN & OUT';
+    const diffColor = difference >= 0 ? '#4ade80' : '#fb7185';
+    preTableHtml = `<div class="log-summary-grid">
+      <div style="background:#1c1833;border:1px solid #302852;border-radius:10px;padding:9px 11px;"><div style="font-size:9px;color:#a29dbd;font-weight:700;">FILTER JENIS</div><div style="font-size:13px;color:#e9d5ff;font-weight:800;margin-top:3px;">${typeText}</div></div>
+      <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.28);border-radius:10px;padding:9px 11px;"><div style="font-size:9px;color:#86efac;font-weight:700;">TOTAL IN</div><div style="font-size:16px;color:#4ade80;font-weight:800;margin-top:3px;">+${fmt(sumIn)}</div></div>
+      <div style="background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.28);border-radius:10px;padding:9px 11px;"><div style="font-size:9px;color:#fda4af;font-weight:700;">TOTAL OUT</div><div style="font-size:16px;color:#fb7185;font-weight:800;margin-top:3px;">-${fmt(sumOut)}</div></div>
+      <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.28);border-radius:10px;padding:9px 11px;"><div style="font-size:9px;color:#67e8f9;font-weight:700;">SELISIH IN − OUT</div><div style="font-size:16px;color:${diffColor};font-weight:800;margin-top:3px;">${difference >= 0 ? '+' : ''}${fmt(difference)}</div></div>
+    </div>`;
   }
 
   const totalRows = rows.length;
