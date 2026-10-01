@@ -13,9 +13,31 @@ module.exports = async (req, res) => {
 
   const SUPABASE_URL = "https://qdljeibmnolizjprignz.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbGplaWJtbm9saXpqcHJpZ256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjcyMDEsImV4cCI6MjEwMTYwMzIwMX0.Z7Gw29C8r8fbg-FcvGVGsBUw1Drt6FXqMmYsVkkSjHk";
+  // Setelah RLS lockdown, cron server memakai service-role dari Environment
+  // Variable Vercel. Sebelum itu, fallback anon menjaga sistem lama tetap jalan.
+  const SUPABASE_SERVER_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+  const normalizeItemCode = (code) => ({
+    'RET_KARU0003': 'RE_KARU0003',
+    'RET_KARU0007': 'RE_KARU0007'
+  }[String(code || '').trim()] || String(code || '').trim());
+
   const headers = {
     "apikey": SUPABASE_ANON_KEY,
-    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    "Authorization": `Bearer ${SUPABASE_SERVER_KEY}`,
+    "Content-Type": "application/json"
+  };
+
+  // Pencatatan monitoring hanya aktif ketika service-role Vercel sudah diisi.
+  // Kegagalan monitoring tidak pernah menggagalkan pengiriman email utama.
+  const recordCronStatus = async (status, message) => {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/system_events?on_conflict=event_key`, {
+        method: 'POST',
+        headers: { ...headers, Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({ event_key: 'daily_alert', last_run: new Date().toISOString(), status, message: String(message || '').slice(0, 500), updated_at: new Date().toISOString() })
+      });
+    } catch (e) { console.warn('Gagal mencatat status cron:', e.message); }
   };
 
   try {
@@ -65,7 +87,7 @@ module.exports = async (req, res) => {
       if (l.status_item === 'AGEN') targetMap = agen;
       else if (l.status_item === 'RETURN') targetMap = ret;
       
-      const item = targetMap[l.kode_item];
+      const item = targetMap[normalizeItemCode(l.kode_item)];
       if (item) {
         if (l.in !== '-') item.akhir += parseInt(l.in) || 0;
         if (l.out !== '-') item.akhir -= parseInt(l.out) || 0;
@@ -191,10 +213,12 @@ module.exports = async (req, res) => {
     });
 
     console.log("Daily report email sent successfully:", info.messageId);
+    await recordCronStatus('success', `Email terkirim: ${riskItems.length} barang risiko`);
     return res.status(200).json({ success: true, message: `Sukses mengirimkan email harian berisi ${riskItems.length} barang risiko.`, messageId: info.messageId });
 
   } catch (error) {
     console.error("Daily report cron failed:", error);
+    await recordCronStatus('error', error.message);
     return res.status(500).json({ error: error.message });
   }
 };
