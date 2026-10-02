@@ -787,8 +787,8 @@
         <p>Format Kolom Excel: Tanggal | Ticket (boleh kosong, dibuat otomatis) | Kode | Jenis(in/out) | QTY | Gerai | Keterangan</p>
         <div class="flex" style="margin-top: 10px;">
           <label class="btn" style="cursor:pointer;">
-            📂 Pilih File Excel
-            <input type="file" id="fileUpload" accept=".xlsx" style="display:none;">
+            📂 Pilih File Excel/CSV/TXT
+            <input type="file" id="fileUpload" accept=".xlsx,.xls,.csv,.txt" style="display:none;">
           </label>
           <span id="fileName">Belum ada file</span>
           <button class="btn btn-primary" onclick="previewBulkUpload()">🔍 Preview & Validasi</button>
@@ -1397,7 +1397,7 @@ async function syncOfflineQueue() {
   showToast(`⏳ Memeriksa dan menyinkronkan ${queue.length} antrean...`, 'info');
 
   let successCount = 0;
-  let deduplicatedCount = 0;
+  let rekeyedCount = 0;
   const remaining = [];
   for (const item of queue) {
     let res = null;
@@ -1408,7 +1408,7 @@ async function syncOfflineQueue() {
 
       if (res && res.success) {
         successCount++;
-        deduplicatedCount += Number(res.deduplicatedCount || 0);
+        rekeyedCount += Number(res.rekeyedCount || 0);
       } else {
         item.attempts = (item.attempts || 0) + 1;
         item.lastAttempt = new Date().toLocaleString('id-ID');
@@ -1431,7 +1431,7 @@ async function syncOfflineQueue() {
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Sinkron'; }
   if (remaining.length === 0) {
     setStatus('online', 'ONLINE');
-    const duplicateInfo = deduplicatedCount > 0 ? ` (${deduplicatedCount} baris ganda diringkas ke data terakhir)` : '';
+    const duplicateInfo = rekeyedCount > 0 ? ` (${rekeyedCount} baris yang sebelumnya tertimpa berhasil dipulihkan)` : '';
     showToast(`✅ ${successCount} antrean berhasil disinkronkan${duplicateInfo}!`, 'success');
     await pullData();
   } else {
@@ -2076,48 +2076,76 @@ async function syncBulkToGAS(sheet, rows, skipQueue = false) {
     if (!supabaseClient) throw new Error('Supabase client belum diinisialisasi');
 
     let error = null;
-    let deduplicatedCount = 0;
+    let rekeyedCount = 0;
     if (table === 'log_transaksi') {
-      const rawDbRows = rows.map(r => ({
-        id: r[0],
-        tanggal: r[1],
-        no_ticket: r[2],
-        kode_item: normalizeItemCode(r[3]),
-        nama_item: r[4],
-        status_item: r[5],
-        in: String(r[6]),
-        out: String(r[7]),
-        nama_gerai: r[8],
-        keterangan: r[9],
-        user: r[10],
-        no_resi: r[11] || '-'
-      }));
+      // Baca cloud untuk mengenali baris yang SUDAH masuk pada percobaan lama.
+      // Ini mencegah duplikat sekaligus memulihkan baris lain yang sempat tertimpa.
+      let cloudRows = [];
+      const { data: cloudData, error: cloudReadErr } = await supabaseClient
+        .from('log_transaksi')
+        .select('id,tanggal,no_ticket,kode_item,in,out,nama_gerai,keterangan')
+        .limit(20000);
+      if (!cloudReadErr && Array.isArray(cloudData)) cloudRows = cloudData;
 
-      // PostgreSQL menolak satu perintah UPSERT jika ID atau kombinasi bisnis
-      // yang sama muncul lebih dari sekali: "cannot affect row a second time".
-      // Ambil baris terakhir (sesuai hasil akhir lokal) untuk setiap ID dan
-      // Tanggal+Ticket+Kode agar retry antrean tetap aman tanpa kehilangan hasil akhir.
-      const seenIds = new Set();
-      const seenBusinessKeys = new Set();
-      const uniqueReversed = [];
-      for (let i = rawDbRows.length - 1; i >= 0; i--) {
-        const row = rawDbRows[i];
-        const businessKey = `${row.tanggal}|${String(row.no_ticket || '').trim()}|${row.kode_item}`;
-        if (!row.id || seenIds.has(row.id) || seenBusinessKeys.has(businessKey)) continue;
-        seenIds.add(row.id);
-        seenBusinessKeys.add(businessKey);
-        uniqueReversed.push(row);
-      }
-      const dbRows = uniqueReversed.reverse();
-      deduplicatedCount = rawDbRows.length - dbRows.length;
-      if (dbRows.length === 0) return { success: true, deduplicatedCount };
+      const cloudById = new Map();
+      const cloudByBase = new Map();
+      cloudRows.forEach(c => {
+        cloudById.set(String(c.id), c);
+        const cType = num(c.in) > 0 ? 'in' : 'out';
+        const cBase = bulkRowBaseKey(c.tanggal, c.no_ticket, c.kode_item, cType, c.nama_gerai);
+        if (!cloudByBase.has(cBase)) cloudByBase.set(cBase, []);
+        cloudByBase.get(cBase).push(c);
+      });
 
+      const lastIndexByOriginalId = new Map();
+      rows.forEach((r, index) => lastIndexByOriginalId.set(String(r[0] || ''), index));
+      const occurrences = {};
+      const usedIds = new Set();
+      const dbRows = rows.map((r, index) => {
+        const jenis = num(r[6]) > 0 ? 'in' : 'out';
+        const baseKey = bulkRowBaseKey(r[1], r[2], r[3], jenis, r[8]);
+        occurrences[baseKey] = (occurrences[baseKey] || 0) + 1;
+        const originalId = String(r[0] || '');
+        let finalId = '';
+
+        // 1) Gunakan ID asli hanya bila record cloud tersebut memang baris/gerai yang sama.
+        const originalCloud = cloudById.get(originalId);
+        if (originalCloud && !usedIds.has(originalId)) {
+          const originalType = num(originalCloud.in) > 0 ? 'in' : 'out';
+          const originalBase = bulkRowBaseKey(originalCloud.tanggal, originalCloud.no_ticket, originalCloud.kode_item, originalType, originalCloud.nama_gerai);
+          if (originalBase === baseKey) finalId = originalId;
+        }
+
+        // 2) Jika ID lama salah/reused, pakai record cloud lain dengan identitas baris yang sama.
+        if (!finalId) {
+          const existingSameBase = (cloudByBase.get(baseKey) || []).find(c => !usedIds.has(String(c.id)));
+          if (existingSameBase) finalId = String(existingSameBase.id);
+        }
+
+        // 3) Baris yang benar-benar belum masuk mendapat ID stabil baru.
+        if (!finalId) {
+          const originalIsLast = lastIndexByOriginalId.get(originalId) === index;
+          finalId = originalId && originalIsLast && !usedIds.has(originalId)
+            ? originalId
+            : stableBulkRowId(baseKey, occurrences[baseKey]);
+          let salt = occurrences[baseKey];
+          while (usedIds.has(finalId)) finalId = stableBulkRowId(baseKey, ++salt);
+        }
+        if (finalId !== originalId) rekeyedCount++;
+        usedIds.add(finalId);
+        return {
+          id: finalId, tanggal: r[1], no_ticket: r[2], kode_item: normalizeItemCode(r[3]),
+          nama_item: r[4], status_item: r[5], in: String(r[6]), out: String(r[7]),
+          nama_gerai: r[8], keterangan: r[9], user: r[10], no_resi: r[11] || '-'
+        };
+      });
+      if (dbRows.length === 0) return { success: true, rekeyedCount };
       const { error: err } = await supabaseClient.from('log_transaksi').upsert(dbRows);
       error = err;
     }
 
     if (error) throw error;
-    return { success: true, deduplicatedCount };
+    return { success: true, rekeyedCount };
   } catch (error) {
     console.error('Supabase Bulk sync failed, queuing to outbox:', error);
     if (!skipQueue) {
@@ -2920,12 +2948,34 @@ function generateBulkTicket(jenis, tanggal, sequence) {
   const datePart = parts ? `${parts[3]}${parts[2]}${parts[1].slice(-2)}` : iso.replace(/[^0-9]/g, '').slice(-6);
   return `${type}${datePart}${String(sequence).padStart(2, '0')}`;
 }
+// Parser QTY upload: menerima angka Excel maupun teks ribuan seperti 1,000 / 1.000.
+function parseBulkQuantity(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  let text = String(value ?? '').trim().replace(/\s/g, '');
+  if (!text) return 0;
+  if (/^-?\d{1,3}(,\d{3})+$/.test(text)) text = text.replace(/,/g, '');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(text)) text = text.replace(/\./g, '');
+  else text = text.replace(/,/g, '');
+  return Number(text) || 0;
+}
+function bulkRowBaseKey(tgl, ticket, kode, jenis, gerai) {
+  return `${formatYMD(tgl)}|${String(ticket || '').trim()}|${normalizeItemCode(kode)}|${String(jenis || '').toLowerCase()}|${String(gerai || '').trim().toLowerCase()}`;
+}
+function stableBulkRowId(baseKey, occurrence) {
+  const text = `${baseKey}|${occurrence}`;
+  let h1 = 2166136261, h2 = 5381;
+  for (let i = 0; i < text.length; i++) {
+    h1 ^= text.charCodeAt(i); h1 = Math.imul(h1, 16777619);
+    h2 = ((h2 << 5) + h2) ^ text.charCodeAt(i);
+  }
+  return `bulk_${(h1 >>> 0).toString(36)}_${(h2 >>> 0).toString(36)}`;
+}
 let bulkPreviewApprovedSignature='';
 function bulkFileSignature(file){return file?`${file.name}|${file.size}|${file.lastModified}`:'';}
 function previewBulkUpload(){
   const input=document.getElementById('fileUpload'),file=input?.files?.[0],box=document.getElementById('bulkPreviewBox');
   if(!file||!box){showToast('Pilih file Excel dulu!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
-  bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0,autoTicketCount=0;const autoSeq={},seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=Number(r[4])||0,tglRaw=r[0],m=data.master.find(x=>x.kode===kode);const tgl=tglRaw?excelDateToISO(tglRaw):'';const manualTicket=String(r[1]??'').trim();const autoType=jenis==='in'?'IN':'OUT';const autoKey=`${autoType}|${tgl}`;if(!manualTicket){autoSeq[autoKey]=(autoSeq[autoKey]||0)+1;autoTicketCount++;}const ticket=manualTicket||generateBulkTicket(jenis,tgl,autoSeq[autoKey]);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const key=`${tgl}|${ticket}|${kode}`;if(seen.has(key)||data.logs.some(l=>formatYMD(l.tanggal)===tgl&&String(l.ticket).trim()===ticket&&String(l.kode).trim()===kode))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
+  bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0,autoTicketCount=0;const autoSeq={},seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=parseBulkQuantity(r[4]),tglRaw=r[0],m=data.master.find(x=>x.kode===kode);const tgl=tglRaw?excelDateToISO(tglRaw):'';const manualTicket=String(r[1]??'').trim();const autoType=jenis==='in'?'IN':'OUT';const autoKey=`${autoType}|${tgl}`;if(!manualTicket){autoSeq[autoKey]=(autoSeq[autoKey]||0)+1;autoTicketCount++;}const ticket=manualTicket||generateBulkTicket(jenis,tgl,autoSeq[autoKey]);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const gerai=String(r[5]||'Gerai Utama').trim();const key=bulkRowBaseKey(tgl,ticket,kode,jenis,gerai);if(seen.has(key)||data.logs.some(l=>bulkRowBaseKey(l.tanggal,l.ticket,l.kode,num(l.in)>0?'in':'out',l.gerai)===key))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
   box.classList.remove('hidden');box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge ok">Ticket otomatis: ${autoTicketCount}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'crit':'ok'}">Potensi stok negatif: ${negative}</span></div>${invalid.length?`<div style="font-size:10px;color:#fca5a5;max-height:90px;overflow:auto;">${invalid.slice(0,20).map(x=>`Baris ${x.baris}: ${x.reason}`).join('<br>')}</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;}catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${err.message}</span>`;}};reader.readAsArrayBuffer(file);
 }
 function approveBulkPreview(){const file=document.getElementById('fileUpload')?.files?.[0];if(!file)return;bulkPreviewApprovedSignature=bulkFileSignature(file);processBulk();}
@@ -5027,6 +5077,8 @@ async function processBulk() {
 
       let replaceCount = 0;
       const autoTicketSeq = {};
+      const bulkOccurrence = {};
+      const claimedExistingIds = new Set();
 
       for (let i = 1; i < json.length; i++) {
         const r = json[i];
@@ -5040,8 +5092,8 @@ async function processBulk() {
         const autoKey = `${autoType}|${tgl}`;
         if (!manualTicket) autoTicketSeq[autoKey] = (autoTicketSeq[autoKey] || 0) + 1;
         const ticket = manualTicket || generateBulkTicket(jenis, tgl, autoTicketSeq[autoKey]);
-        const qty = Number(r[4]) || 0;
-        const gerai = String(r[5] || 'Gerai Utama');
+        const qty = parseBulkQuantity(r[4]);
+        const gerai = String(r[5] || 'Gerai Utama').trim();
         // Jika kolom keterangan di Excel kosong, biarkan kosong ('-') — jangan diisi otomatis 'Upload Massal'
         const ketRaw = (r[6] === undefined || r[6] === null) ? '' : String(r[6]).trim();
         const ket = ketRaw !== '' ? ketRaw : '-';
@@ -5064,19 +5116,25 @@ async function processBulk() {
         const inVal = jenis === 'in' ? qty : '-';
         const outVal = jenis === 'out' ? qty : '-';
 
-        // --- FITUR AUTO-REPLACE (UPSERT) ---
-        // Cari apakah transaksi dengan Tanggal, No Tiket, dan Kode Barang yang sama sudah ada di database
-        const existingIdx = data.logs.findIndex(l => 
-          formatYMD(l.tanggal) === formatYMD(tgl) && 
-          String(l.ticket).trim() === ticket && 
-          String(l.kode).trim() === kode
-        );
+        // Identitas baris mencakup Gerai dan urutan kemunculan. Dengan demikian,
+        // ticket+barang yang sama untuk banyak gerai TIDAK saling menimpa.
+        const rowBaseKey = bulkRowBaseKey(tgl, ticket, kode, jenis, gerai);
+        bulkOccurrence[rowBaseKey] = (bulkOccurrence[rowBaseKey] || 0) + 1;
+        const occurrence = bulkOccurrence[rowBaseKey];
+        const deterministicId = stableBulkRowId(rowBaseKey, occurrence);
+        const existingIdx = data.logs.findIndex(l => {
+          if (claimedExistingIds.has(l.id)) return false;
+          const logType = num(l.in) > 0 ? 'in' : 'out';
+          const sameBase = bulkRowBaseKey(l.tanggal, l.ticket, l.kode, logType, l.gerai) === rowBaseKey;
+          return l.id === deterministicId || sameBase;
+        });
 
         let id;
         if (existingIdx !== -1) {
           // Jika ada duplikat: Timpa lokal & gunakan ID yang sama agar Supabase meng-update datanya (UPSERT)
           const oldLog = data.logs[existingIdx];
           id = oldLog.id;
+          claimedExistingIds.add(id);
           
           // Kurangi stok lama sebelum ditimpa dengan stok baru
           stock.akhir -= num(oldLog.in);
@@ -5089,8 +5147,10 @@ async function processBulk() {
           };
           replaceCount++;
         } else {
-          // Jika tidak ada duplikat: Buat log baru
-          id = genId();
+          // Baris baru mendapat ID stabil; upload ulang file yang sama akan UPDATE,
+          // bukan membuat duplikat, tetapi setiap baris/gerai tetap tersimpan.
+          id = deterministicId;
+          claimedExistingIds.add(id);
           data.logs.push({
             id, tanggal: tgl, ticket, kode,
             item: master.item, status: stat,
