@@ -1397,6 +1397,7 @@ async function syncOfflineQueue() {
   showToast(`⏳ Memeriksa dan menyinkronkan ${queue.length} antrean...`, 'info');
 
   let successCount = 0;
+  let deduplicatedCount = 0;
   const remaining = [];
   for (const item of queue) {
     let res = null;
@@ -1405,8 +1406,10 @@ async function syncOfflineQueue() {
       else if (item.action === 'bulk_delete') res = await syncBulkDeleteToGAS(item.sheetTarget, item.targetId, true);
       else res = await syncToGAS(item.sheetTarget, item.row, item.action, item.targetId, true);
 
-      if (res && res.success) successCount++;
-      else {
+      if (res && res.success) {
+        successCount++;
+        deduplicatedCount += Number(res.deduplicatedCount || 0);
+      } else {
         item.attempts = (item.attempts || 0) + 1;
         item.lastAttempt = new Date().toLocaleString('id-ID');
         item.lastError = String(res?.message || 'Respons sinkronisasi tidak berhasil').replace(/^Gagal:\s*/i, '').slice(0, 300);
@@ -1428,7 +1431,8 @@ async function syncOfflineQueue() {
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Sinkron'; }
   if (remaining.length === 0) {
     setStatus('online', 'ONLINE');
-    showToast(`✅ ${successCount} antrean berhasil disinkronkan!`, 'success');
+    const duplicateInfo = deduplicatedCount > 0 ? ` (${deduplicatedCount} baris ganda diringkas ke data terakhir)` : '';
+    showToast(`✅ ${successCount} antrean berhasil disinkronkan${duplicateInfo}!`, 'success');
     await pullData();
   } else {
     // Internet dapat tetap online; tampilkan penyebab data sebenarnya, bukan pesan internet generik.
@@ -2072,12 +2076,13 @@ async function syncBulkToGAS(sheet, rows, skipQueue = false) {
     if (!supabaseClient) throw new Error('Supabase client belum diinisialisasi');
 
     let error = null;
+    let deduplicatedCount = 0;
     if (table === 'log_transaksi') {
-      const dbRows = rows.map(r => ({
+      const rawDbRows = rows.map(r => ({
         id: r[0],
         tanggal: r[1],
         no_ticket: r[2],
-        kode_item: r[3],
+        kode_item: normalizeItemCode(r[3]),
         nama_item: r[4],
         status_item: r[5],
         in: String(r[6]),
@@ -2087,12 +2092,32 @@ async function syncBulkToGAS(sheet, rows, skipQueue = false) {
         user: r[10],
         no_resi: r[11] || '-'
       }));
+
+      // PostgreSQL menolak satu perintah UPSERT jika ID atau kombinasi bisnis
+      // yang sama muncul lebih dari sekali: "cannot affect row a second time".
+      // Ambil baris terakhir (sesuai hasil akhir lokal) untuk setiap ID dan
+      // Tanggal+Ticket+Kode agar retry antrean tetap aman tanpa kehilangan hasil akhir.
+      const seenIds = new Set();
+      const seenBusinessKeys = new Set();
+      const uniqueReversed = [];
+      for (let i = rawDbRows.length - 1; i >= 0; i--) {
+        const row = rawDbRows[i];
+        const businessKey = `${row.tanggal}|${String(row.no_ticket || '').trim()}|${row.kode_item}`;
+        if (!row.id || seenIds.has(row.id) || seenBusinessKeys.has(businessKey)) continue;
+        seenIds.add(row.id);
+        seenBusinessKeys.add(businessKey);
+        uniqueReversed.push(row);
+      }
+      const dbRows = uniqueReversed.reverse();
+      deduplicatedCount = rawDbRows.length - dbRows.length;
+      if (dbRows.length === 0) return { success: true, deduplicatedCount };
+
       const { error: err } = await supabaseClient.from('log_transaksi').upsert(dbRows);
       error = err;
     }
 
     if (error) throw error;
-    return { success: true };
+    return { success: true, deduplicatedCount };
   } catch (error) {
     console.error('Supabase Bulk sync failed, queuing to outbox:', error);
     if (!skipQueue) {
