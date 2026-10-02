@@ -7,7 +7,7 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Prefer'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Prefer, Authorization'
   );
 
   if (req.method === 'OPTIONS') {
@@ -34,6 +34,13 @@ module.exports = async (req, res) => {
   queryParams.searchParams.append('apikey', SUPABASE_ANON_KEY);
 
   try {
+    // Jika frontend sudah login Supabase Auth, teruskan JWT user agar RLS dapat
+    // mengenali role. Tanpa JWT, request tetap menggunakan anon untuk public read.
+    const incomingAuth = String(req.headers.authorization || '');
+    const forwardedAuth = /^Bearer\s+\S+/i.test(incomingAuth)
+      ? incomingAuth
+      : `Bearer ${SUPABASE_ANON_KEY}`;
+
     // Gunakan global fetch (bawaan Node.js 18+ di Vercel)
     const response = await fetch(queryParams.toString(), {
       method: req.method,
@@ -41,7 +48,7 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json',
         'Prefer': req.headers['prefer'] || '',
         'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        'Authorization': forwardedAuth
       },
       body: ['POST', 'PATCH', 'PUT'].includes(req.method) ? JSON.stringify(req.body) : null
     });

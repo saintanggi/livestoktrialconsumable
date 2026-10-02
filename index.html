@@ -469,6 +469,7 @@
         <span>⚠️ Antrean Lokal (Offline)</span>
         <span id="offlineQueueCount" class="badge warn" style="padding:1px 5px; font-size:9px; border-radius:4px;">0</span>
       </span>
+      <div id="offlineQueueDetail" style="width:100%;font-size:9px;color:#c9b8e8;line-height:1.35;word-break:break-word;"></div>
       <div style="display: flex; gap: 6px; width: 100%;">
         <button class="btn btn-primary" style="padding:3px 6px; font-size:10px; flex: 1; font-weight:600; background:#f2a93b; color:#000;" onclick="syncOfflineQueue()">🔄 Sinkron</button>
         <button class="btn btn-danger" style="padding:3px 6px; font-size:10px; flex: 1; font-weight:600; background:#ff4a4d1a; border-color:#ff4a4d33; color:#ff4a4d;" onclick="clearOfflineQueue()">🗑️ Kosongkan</button>
@@ -1356,12 +1357,20 @@ function updateOfflineStatusUI() {
   const queue = JSON.parse(localStorage.getItem('stock_offline_queue') || '[]');
   const box = document.getElementById('offlineQueueBox');
   const count = document.getElementById('offlineQueueCount');
+  const detail = document.getElementById('offlineQueueDetail');
   if (box && count) {
     if (queue.length > 0) {
       box.style.display = 'flex';
       count.textContent = queue.length;
+      if (detail) {
+        const first = queue[0];
+        const target = `${first.action || 'aksi'} · ${first.sheetTarget || 'data'}`;
+        detail.textContent = first.lastError ? `${target} — ${first.lastError}` : `${target} — menunggu sinkronisasi`;
+        detail.style.color = first.lastError ? '#ff9b9b' : '#c9b8e8';
+      }
     } else {
       box.style.display = 'none';
+      if (detail) detail.textContent = '';
     }
   }
 }
@@ -1377,68 +1386,55 @@ function clearOfflineQueue() {
 async function syncOfflineQueue() {
   if (!isLoggedIn()) {
     showToast('🔐 Login terlebih dahulu untuk sinkronisasi antrean!', 'error');
-    showLogin();
-    return;
+    showLogin(); return;
   }
   let queue = JSON.parse(localStorage.getItem('stock_offline_queue') || '[]');
-  if (queue.length === 0) {
-    showToast('Tidak ada antrean tertunda.', 'info');
-    return;
-  }
+  if (queue.length === 0) { showToast('Tidak ada antrean tertunda.', 'info'); return; }
 
   const btn = document.querySelector('#offlineQueueBox button');
-  if (btn) { 
-    btn.disabled = true; 
-    btn.textContent = '⏳ Menyinkronkan...'; 
-  }
-  setStatus('syncing', 'SYNC OFFLINE...');
-  showToast(`⏳ Sinkronisasi ${queue.length} antrean dimulai...`, 'info');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyinkronkan...'; }
+  setStatus('syncing', 'SYNC QUEUE...');
+  showToast(`⏳ Memeriksa dan menyinkronkan ${queue.length} antrean...`, 'info');
 
   let successCount = 0;
-  let failedCount = 0;
-
-  for (let item of queue) {
-    let res;
+  const remaining = [];
+  for (const item of queue) {
+    let res = null;
     try {
-      if (item.action === 'bulk_append') {
-        res = await syncBulkToGAS(item.sheetTarget, item.row, true); // true to skip automatic queuing
-      } else if (item.action === 'bulk_delete') {
-        res = await syncBulkDeleteToGAS(item.sheetTarget, item.targetId, true);
-      } else {
-        res = await syncToGAS(item.sheetTarget, item.row, item.action, item.targetId, true);
-      }
+      if (item.action === 'bulk_append') res = await syncBulkToGAS(item.sheetTarget, item.row, true);
+      else if (item.action === 'bulk_delete') res = await syncBulkDeleteToGAS(item.sheetTarget, item.targetId, true);
+      else res = await syncToGAS(item.sheetTarget, item.row, item.action, item.targetId, true);
 
-      if (res && res.success) {
-        successCount++;
-      } else {
-        failedCount++;
-        break;
+      if (res && res.success) successCount++;
+      else {
+        item.attempts = (item.attempts || 0) + 1;
+        item.lastAttempt = new Date().toLocaleString('id-ID');
+        item.lastError = String(res?.message || 'Respons sinkronisasi tidak berhasil').replace(/^Gagal:\s*/i, '').slice(0, 300);
+        remaining.push(item);
       }
     } catch (err) {
-      failedCount++;
-      break;
+      item.attempts = (item.attempts || 0) + 1;
+      item.lastAttempt = new Date().toLocaleString('id-ID');
+      item.lastError = String(err?.message || err || 'Kesalahan tidak dikenal').slice(0, 300);
+      remaining.push(item);
     }
   }
 
-  if (successCount > 0) {
-    queue.splice(0, successCount);
-    localStorage.setItem('stock_offline_queue', JSON.stringify(queue));
-    addAudit('SYNC_OFFLINE', `Berhasil sinkron ${successCount} transaksi tertunda ke cloud`);
-  }
-
+  if (remaining.length) localStorage.setItem('stock_offline_queue', JSON.stringify(remaining));
+  else localStorage.removeItem('stock_offline_queue');
+  if (successCount > 0) addAudit('SYNC_OFFLINE', `Berhasil sinkron ${successCount} transaksi tertunda ke cloud`);
   updateOfflineStatusUI();
 
-  if (failedCount === 0) {
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 Sinkron'; }
+  if (remaining.length === 0) {
     setStatus('online', 'ONLINE');
-    showToast(`✅ Berhasil menyinkronkan ${successCount} data ke cloud!`, 'success');
+    showToast(`✅ ${successCount} antrean berhasil disinkronkan!`, 'success');
     await pullData();
   } else {
-    setStatus('offline', 'ERR (SYNC)');
-    showToast(`⚠️ Sinkronisasi terputus. ${successCount} berhasil, ${queue.length} masih tertunda. Periksa internet!`, 'error');
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = '🔄 Sinkron Sekarang';
-    }
+    // Internet dapat tetap online; tampilkan penyebab data sebenarnya, bukan pesan internet generik.
+    setStatus('online', 'ONLINE · QUEUE ERROR');
+    const reason = remaining[0].lastError || 'Data perlu diperiksa';
+    showToast(`⚠️ ${remaining.length} antrean belum tersinkron: ${reason}`, 'error');
   }
 }
 const rowsPerPage = 25;
@@ -1922,18 +1918,23 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
     let error = null;
     if (table === 'master_barang') {
       if (action === 'append') {
-        const dbId = 'm_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
-        const { error: err } = await supabaseClient.from('master_barang').insert({
-          id: dbId,
-          kode: row[0],
-          item: row[1],
-          status: row[2], // HO, AGEN, RETURN
-          satuan: row[3],
-          buffer: parseInt(row[4]) || 0,
-          awal: parseInt(row[5]) || 0,
+        // Retry aman: jika kode sudah tersimpan pada percobaan sebelumnya,
+        // lakukan update alih-alih insert ulang yang memicu duplicate key.
+        const payload = {
+          kode: row[0], item: row[1], status: row[2], satuan: row[3],
+          buffer: parseInt(row[4]) || 0, awal: parseInt(row[5]) || 0,
           foto_barang_url: row[6] || '-'
-        });
-        error = err;
+        };
+        const { data: existing, error: checkErr } = await supabaseClient.from('master_barang').select('id').eq('kode', row[0]).limit(1);
+        if (checkErr) throw checkErr;
+        if (existing && existing.length > 0) {
+          const { error: err } = await supabaseClient.from('master_barang').update(payload).eq('kode', row[0]);
+          error = err;
+        } else {
+          const dbId = 'm_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+          const { error: err } = await supabaseClient.from('master_barang').insert({ id: dbId, ...payload });
+          error = err;
+        }
       } else if (action === 'update') {
         const { error: err } = await supabaseClient.from('master_barang').update({
           kode: row[0],
@@ -1951,10 +1952,13 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
       }
     } else if (table === 'gerai') {
       if (action === 'append') {
-        const { error: err } = await supabaseClient.from('gerai').insert({
-          nama: row[0]
-        });
-        error = err;
+        const { data: existing, error: checkErr } = await supabaseClient.from('gerai').select('nama').eq('nama', row[0]).limit(1);
+        if (checkErr) throw checkErr;
+        if (existing && existing.length > 0) error = null;
+        else {
+          const { error: err } = await supabaseClient.from('gerai').insert({ nama: row[0] });
+          error = err;
+        }
       } else if (action === 'delete') {
         const { error: err } = await supabaseClient.from('gerai').delete().eq('nama', id);
         error = err;
@@ -1973,7 +1977,7 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
       }
     } else if (table === 'purchase_orders') {
       if (action === 'append') {
-        const { error: err } = await supabaseClient.from('purchase_orders').insert({
+        const { error: err } = await supabaseClient.from('purchase_orders').upsert({
           id: row[0],
           tgl_order: row[1],
           nama_barang: row[2],
@@ -1991,7 +1995,7 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
       }
     } else if (table === 'po_deliveries') {
       if (action === 'append') {
-        const { error: err } = await supabaseClient.from('po_deliveries').insert({
+        const { error: err } = await supabaseClient.from('po_deliveries').upsert({
           id: row[0],
           no_po: row[1],
           tgl_masuk: row[2],
@@ -2008,7 +2012,7 @@ async function syncToGAS(sheet, row, action = 'append', id = null, skipQueue = f
       }
     } else if (table === 'log_transaksi') {
       if (action === 'append') {
-        const { error: err } = await supabaseClient.from('log_transaksi').insert({
+        const { error: err } = await supabaseClient.from('log_transaksi').upsert({
           id: row[0],
           tanggal: row[1],
           no_ticket: row[2],
