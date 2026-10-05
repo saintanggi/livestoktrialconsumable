@@ -1052,7 +1052,7 @@
     </div>
 
     <div class="footer">
-      <span id="footerInfo">LIVE STOCK SYSTEM | Shortcut: <kbd>Ctrl+I</kbd> (Input Trx), <kbd>Esc</kbd> (Tutup Modal)</span>
+      <span id="footerInfo">LIVE STOCK SYSTEM · REPORT ASC v2026.10.05 | Shortcut: <kbd>Ctrl+I</kbd> (Input Trx), <kbd>Esc</kbd> (Tutup Modal)</span>
       <div class="flex" style="gap: 8px; margin-top: 4px; display: none;" id="adminFooterActions">
         <button class="btn" onclick="pullData()" style="color:#f2a93b; border-color:#f2a93b;">☁️ Tarik Data dari Supabase</button>
         <button class="btn" onclick="testGASConnection()" style="color:#58a6ff; border-color:#58a6ff;">🔌 Test Koneksi Supabase</button>
@@ -2897,24 +2897,24 @@ function renderForecastDashboard() {
 }
 
 function forecastExportRows(rows) { return rows.map((r,i)=>({'NO':i+1,'GUDANG':r.gudang,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AKHIR':r.stock,'TOTAL OUT PERIODE':r.totalOut30,'JUMLAH HARI ANALISIS':r.analysisDays,'RATA-RATA OUT/HARI':Number(r.avgOut.toFixed(2)),'ESTIMASI HARI HABIS':r.daysToEmpty===null?'TIDAK ADA OUT':r.daysToEmpty,'PERKIRAAN TANGGAL HABIS':r.estimatedDate||'-','REKOMENDASI PO 30 HARI':r.recommendation})); }
-function exportForecastExcel(){ if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;} const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(forecastExportRows(getForecastRows())),'Prediksi_Stok');XLSX.writeFile(wb,`Prediksi_Stok_30_Hari_${new Date().toISOString().split('T')[0]}.xlsx`); }
+function exportForecastExcel(){ if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;} const wb=XLSX.utils.book_new();const sorted=getForecastRows().sort((a,b)=>(a.estimatedDate||'9999-12-31').localeCompare(b.estimatedDate||'9999-12-31'));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(forecastExportRows(sorted)),'Prediksi_Stok');XLSX.writeFile(wb,`Prediksi_Stok_30_Hari_${new Date().toISOString().split('T')[0]}.xlsx`); }
 
 function renderPoRecommendation(){ const wh=document.getElementById('poRecWarehouse')?.value||'ALL';const gf=getGlobalFilters();const rows=getForecastRows().filter(r=>r.recommendation>0&&(wh==='ALL'||r.gudang===wh)&&(gf.warehouse==='ALL'||r.gudang===gf.warehouse)&&(gf.status==='ALL'||r.status===gf.status)).sort((a,b)=>b.recommendation-a.recommendation);document.getElementById('poRecommendationContent').innerHTML=`<div style="margin-bottom:10px;"><span class="badge warn">${rows.length} barang direkomendasikan</span></div><div class="table-wrap"><div class="scroll"><table><thead><tr><th>Gudang</th><th>Kode</th><th>Nama Barang</th><th class="text-right">Stok</th><th class="text-right">Buffer</th><th class="text-right">Avg OUT/Hari</th><th class="text-right">Kebutuhan 30 Hari</th><th class="text-right">Rekomendasi QTY PO</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${r.gudang}</td><td class="text-muted">${r.kode}</td><td>${r.item}</td><td class="text-right">${fmt(r.stock)}</td><td class="text-right">${fmt(r.buffer)}</td><td class="text-right">${r.avgOut.toLocaleString('id-ID',{maximumFractionDigits:2})}</td><td class="text-right">${fmt(Math.ceil(r.avgOut*PO_TARGET_DAYS))}</td><td class="text-right" style="color:#fbbf24;font-weight:800;">${fmt(r.recommendation)}</td></tr>`).join(''):'<tr><td colspan="8" class="text-center text-muted">Belum ada barang yang membutuhkan rekomendasi PO</td></tr>'}</tbody></table></div></div>`; }
-function exportPoRecommendation(){if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}const rows=getForecastRows().filter(r=>r.recommendation>0);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(forecastExportRows(rows)),'Rekomendasi_PO');XLSX.writeFile(wb,`Rekomendasi_PO_30_Hari_${new Date().toISOString().split('T')[0]}.xlsx`);}
+function exportPoRecommendation(){if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}const rows=getForecastRows().filter(r=>r.recommendation>0).sort((a,b)=>(a.daysToEmpty??999999)-(b.daysToEmpty??999999));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(forecastExportRows(rows)),'Rekomendasi_PO');XLSX.writeFile(wb,`Rekomendasi_PO_30_Hari_${new Date().toISOString().split('T')[0]}.xlsx`);}
 
 function exportAllStockWorkbook(){
   if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
   const gf=getGlobalFilters(), start=document.getElementById('stockExportStart')?.value||gf.start, end=document.getElementById('stockExportEnd')?.value||gf.end;
   if(start&&end&&start>end){showToast('Tanggal mulai tidak boleh melebihi tanggal selesai!','error');return;}
   const wb=XLSX.utils.book_new();
-  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,label])=>{let rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);rows=applyGlobalStockFilter(rows,label);const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
+  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,label])=>{let rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);rows=applyGlobalStockFilter(rows,label).sort((a,b)=>String(a.kode||'').localeCompare(String(b.kode||''),'id',{numeric:true}));const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
   XLSX.writeFile(wb,`Rekap_Semua_Stok_${start||'awal'}_sd_${end||'berjalan'}.xlsx`);showToast('✅ Semua stok berhasil didownload dalam 3 sheet!','success');
 }
 
 function createBackupPayload(){return {app:'LiveStockConsumable',version:2,created_at:new Date().toISOString(),created_by:currentUser?.username||'System',data:JSON.parse(JSON.stringify(data))};}
 function downloadBlob(content,name,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function downloadBackupJSON(){if(!isAdmin()){showToast('Hanya admin yang dapat membuat backup!','error');return;}const d=new Date().toISOString().replace(/[:.]/g,'-');downloadBlob(JSON.stringify(createBackupPayload(),null,2),`Backup_LiveStock_${d}.json`,'application/json');addAudit('BACKUP_EXPORT','Mengunduh backup JSON lengkap');showToast('✅ Backup JSON berhasil dibuat!','success');}
-function downloadBackupExcel(){if(!isAdmin()){showToast('Hanya admin yang dapat membuat backup!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}const wb=XLSX.utils.book_new();const sheets={Master:data.master||[],Log_Transaksi:data.logs||[],Gerai:(data.gerai||[]).map(n=>({nama:n})),Purchase_Orders:data.po||[],PO_Deliveries:data.po_deliveries||[],Audit:data.audit||[]};Object.entries(sheets).forEach(([n,r])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r),n.slice(0,31)));XLSX.writeFile(wb,`Backup_LiveStock_${new Date().toISOString().split('T')[0]}.xlsx`);addAudit('BACKUP_EXPORT','Mengunduh backup Excel multi-sheet');}
+function downloadBackupExcel(){if(!isAdmin()){showToast('Hanya admin yang dapat membuat backup!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}const wb=XLSX.utils.book_new();const sheets={Master:[...(data.master||[])].sort((a,b)=>String(a.kode||'').localeCompare(String(b.kode||''),'id',{numeric:true})),Log_Transaksi:sortLogsOldestFirst(data.logs||[]),Gerai:(data.gerai||[]).map(n=>({nama:n})),Purchase_Orders:[...(data.po||[])].sort((a,b)=>compareOptionalDateAscending(a,b,'tgl_order')),PO_Deliveries:[...(data.po_deliveries||[])].sort((a,b)=>compareOptionalDateAscending(a,b,'tgl_masuk')),Audit:data.audit||[]};Object.entries(sheets).forEach(([n,r])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r),n.slice(0,31)));XLSX.writeFile(wb,`Backup_LiveStock_${new Date().toISOString().split('T')[0]}.xlsx`);addAudit('BACKUP_EXPORT','Mengunduh backup Excel multi-sheet');}
 function previewRestoreBackup(){
   if(!isAdmin()){showToast('Hanya admin yang dapat memulihkan backup!','error');return;}
   const file=document.getElementById('restoreBackupFile')?.files?.[0], box=document.getElementById('restorePreview');pendingRestoreBackup=null;if(!file)return;
@@ -3981,6 +3981,24 @@ function renderContent() {
   populateDropdowns();
 }
 
+// Standar urutan seluruh laporan bertanggal: tanggal terkecil/terlama di atas.
+function sortLogsOldestFirst(logs) {
+  return [...(logs || [])].sort((a, b) => {
+    const dateCompare = formatYMD(a.tanggal).localeCompare(formatYMD(b.tanggal));
+    if (dateCompare !== 0) return dateCompare;
+    const ticketCompare = String(a.ticket || '').localeCompare(String(b.ticket || ''), 'id', { numeric: true });
+    if (ticketCompare !== 0) return ticketCompare;
+    const codeCompare = String(a.kode || '').localeCompare(String(b.kode || ''), 'id', { numeric: true });
+    if (codeCompare !== 0) return codeCompare;
+    return String(a.gerai || '').localeCompare(String(b.gerai || ''), 'id');
+  });
+}
+function compareOptionalDateAscending(a, b, field) {
+  const av = formatYMD(a?.[field] || '9999-12-31');
+  const bv = formatYMD(b?.[field] || '9999-12-31');
+  return av.localeCompare(bv);
+}
+
 function exportLogByWarehouse(warehouse) {
   const start = document.getElementById('exportStart').value;
   const end = document.getElementById('exportEnd').value;
@@ -4004,6 +4022,9 @@ function exportLogByWarehouse(warehouse) {
   });
 
   filteredLogs = filteredLogs.filter(l => logPassesGlobalFilter(l, true));
+
+  // Wajib: baris pertama adalah tanggal terkecil, baris terakhir tanggal terbesar.
+  filteredLogs = sortLogsOldestFirst(filteredLogs);
 
   if (filteredLogs.length === 0) {
     showToast(`Tidak ada data log untuk kategori ${warehouse} pada rentang tanggal tersebut!`, 'error');
@@ -4052,7 +4073,7 @@ function exportStokByWarehouse(key) {
   }
 
   let rows = periodMode ? getStockRowsForPeriod(key, fStartVal, fEndVal) : (data[key] || []);
-  rows = applyGlobalStockFilter(rows, label);
+  rows = applyGlobalStockFilter(rows, label).sort((a,b) => String(a.kode||'').localeCompare(String(b.kode||''), 'id', {numeric:true}));
 
   if (!rows.length) {
     showToast(`Tidak ada data stok ${label} untuk didownload!`, 'error');
@@ -4980,8 +5001,12 @@ function exportStokHarian() {
   if (!start || !end) { showToast('Pilih rentang tanggal mulai dan sampai!', 'error'); return; }
   if (new Date(start) > new Date(end)) { showToast('Tanggal mulai tidak valid!', 'error'); return; }
 
-  let items = data.master;
+  let items = [...data.master];
   if (gudang !== 'ALL') items = items.filter(m => getNormalizedStatus(m.status) === gudang);
+  items.sort((a,b) => {
+    const statusCmp = getNormalizedStatus(a.status).localeCompare(getNormalizedStatus(b.status));
+    return statusCmp || String(a.kode||'').localeCompare(String(b.kode||''), 'id', {numeric:true});
+  });
 
   let dateList = [];
   let curr = new Date(start + 'T00:00:00');
