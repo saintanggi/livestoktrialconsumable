@@ -46,7 +46,7 @@ module.exports = async (req, res) => {
       const users = (authData.users || []).map(u => {
         const p = profileMap.get(u.id) || {};
         return {
-          id: u.id, email: u.email, display_name: p.display_name || u.user_metadata?.display_name || u.email?.split('@')[0],
+          id: u.id, email: u.email, login_name: p.login_name || u.user_metadata?.login_name || null, display_name: p.display_name || u.user_metadata?.display_name || u.email?.split('@')[0],
           role: p.role || 'viewer', active: p.active !== false,
           created_at: u.created_at, last_sign_in_at: u.last_sign_in_at || null,
           is_owner: u.id === caller.id
@@ -56,22 +56,31 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === 'POST') {
-      const email = String(req.body?.email || '').trim().toLowerCase();
+      const loginType = String(req.body?.login_type || 'email');
+      const rawLogin = String(req.body?.login || req.body?.email || '').trim().toLowerCase();
       const password = String(req.body?.password || '');
-      const displayName = String(req.body?.display_name || '').trim() || email.split('@')[0];
       const role = String(req.body?.role || 'viewer');
-      if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'Format email tidak valid.' });
+      let email = rawLogin;
+      let loginName = null;
+      if (loginType === 'username') {
+        if (!/^[a-z0-9._-]{3,30}$/.test(rawLogin)) return res.status(400).json({ error: 'Username 3–30 karakter: huruf kecil, angka, titik, garis bawah, atau minus.' });
+        loginName = rawLogin;
+        email = `${rawLogin}@internal.livestock.local`;
+        const existingLogin = await parseResponse(await fetch(`${SUPABASE_URL}/rest/v1/profiles?login_name=eq.${encodeURIComponent(loginName)}&select=id`, { headers: serviceHeaders }));
+        if (existingLogin.length) return res.status(409).json({ error: 'Username sudah digunakan.' });
+      } else if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'Format email tidak valid.' });
+      const displayName = String(req.body?.display_name || '').trim() || loginName || email.split('@')[0];
       if (password.length < 8) return res.status(400).json({ error: 'Password sementara minimal 8 karakter.' });
       if (!ALLOWED_ROLES.includes(role)) return res.status(400).json({ error: 'Role tidak diizinkan.' });
       const created = await parseResponse(await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
         method: 'POST', headers: serviceHeaders,
-        body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { display_name: displayName } })
+        body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { display_name: displayName, login_name: loginName, login_type: loginType } })
       }));
       await parseResponse(await fetch(`${SUPABASE_URL}/rest/v1/profiles?on_conflict=id`, {
         method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify({ id: created.id, email, display_name: displayName, role, active: true, updated_at: new Date().toISOString() })
+        body: JSON.stringify({ id: created.id, email, login_name: loginName, display_name: displayName, role, active: true, updated_at: new Date().toISOString() })
       }));
-      return res.status(201).json({ success: true, id: created.id, email, role });
+      return res.status(201).json({ success: true, id: created.id, email: loginName ? null : email, login_name: loginName, role });
     }
 
     const userId = String(req.body?.id || req.query?.id || '');

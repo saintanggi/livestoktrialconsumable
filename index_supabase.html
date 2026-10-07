@@ -876,7 +876,8 @@
         🔐 Akun pada menu ini tersimpan permanen di Supabase dan dapat digunakan dari PC/browser mana pun. Hanya Super Admin yang dapat membuat atau mengubah akun.
       </div>
       <div class="form-grid" style="margin-bottom:20px; padding-bottom:15px; border-bottom:1px dashed #23203f;">
-        <div class="form-group"><label>Email Login</label><input type="email" id="newUser" placeholder="gudang@perusahaan.com" autocomplete="off"></div>
+        <div class="form-group"><label>Jenis Login</label><select id="newLoginType" onchange="updateNewUserLoginHint()"><option value="username">Username Tanpa Email</option><option value="email">Email</option></select></div>
+        <div class="form-group"><label id="newUserLabel">Username Login</label><input type="text" id="newUser" placeholder="contoh: gudangho" autocomplete="off"><small id="newUserHint" style="font-size:9px;color:#8b86a7;">3–30 karakter, tanpa spasi. Akun tersimpan permanen di Supabase.</small></div>
         <div class="form-group"><label>Nama Pengguna</label><input type="text" id="newDisplayName" placeholder="Contoh: Gudang HO" autocomplete="off"></div>
         <div class="form-group"><label>Password Sementara</label><input type="text" id="newPass" class="masked-password-input" placeholder="Minimal 8 karakter" autocomplete="new-password"></div>
         <div class="form-group"><label>Hak Akses</label>
@@ -917,7 +918,7 @@
           <table style="table-layout: auto;">
             <thead>
               <tr>
-                <th>Email</th>
+                <th>Login</th>
                 <th>Nama</th>
                 <th>Role</th>
                 <th>Status</th>
@@ -2402,6 +2403,10 @@ function setStatus(state, text) {
   label.textContent = text || s.txt;
 }
 
+function usernameToInternalEmail(username) {
+  return `${String(username || '').trim().toLowerCase()}@internal.livestock.local`;
+}
+
 function showLogin() { document.getElementById('loginModal').classList.add('active'); }
 function hideLogin() { document.getElementById('loginModal').classList.remove('active'); }
 async function doLogin() {
@@ -2419,6 +2424,18 @@ async function doLogin() {
     }
     return;
   }
+  // Username permanen Supabase: tidak memerlukan email untuk tim gudang.
+  // Jika belum terdaftar sebagai akun permanen, lanjutkan fallback login lokal lama.
+  try {
+    showToast('⏳ Memverifikasi akun permanen...', 'info');
+    await loginWithSupabase(usernameToInternalEmail(u), p, u);
+    hideLogin(); updateUI(); await pullData();
+    showToast('✅ Login akun permanen berhasil sebagai ' + currentUser.username, 'success');
+    return;
+  } catch (permanentErr) {
+    // Fallback transisi ke user lokal lama di bawah.
+  }
+
   const found = users.find(x => x.username === u);
   if (found) {
     // 1. Uji kecocokan langsung teks polos (Failsafe Terkuat)
@@ -2506,7 +2523,7 @@ function updateUI() {
       const initials = currentUser.username.substring(0, 2).toUpperCase();
       document.getElementById('sidebarProfileAvatar').textContent = initials;
       document.getElementById('sidebarProfileName').textContent = currentUser.username.toUpperCase();
-      document.getElementById('sidebarProfileEmail').textContent = currentUser.email || (currentUser.username.toLowerCase() + '@livestock.id');
+      document.getElementById('sidebarProfileEmail').textContent = currentUser.login_name ? '@' + currentUser.login_name + ' · AKUN PERMANEN' : (currentUser.email || currentUser.username.toLowerCase() + '@livestock.id');
     }
   } else {
     if (profileCard) profileCard.style.display = 'none';
@@ -2559,28 +2576,40 @@ async function loadCloudUsers() {
   catch(err){tbody.innerHTML=`<tr><td colspan="6" class="text-center" style="padding:18px;color:#fb7185;">${escapeHtml(err.message)}<br><small>Pastikan api/admin-users.js dan SUPABASE_SERVICE_ROLE_KEY sudah terpasang.</small></td></tr>`;}
 }
 
+function updateNewUserLoginHint() {
+  const type=document.getElementById('newLoginType')?.value||'username';
+  const input=document.getElementById('newUser'),label=document.getElementById('newUserLabel'),hint=document.getElementById('newUserHint');
+  if(!input)return;
+  input.type=type==='email'?'email':'text';
+  input.placeholder=type==='email'?'user@perusahaan.com':'contoh: gudangho';
+  if(label)label.textContent=type==='email'?'Email Login':'Username Login';
+  if(hint)hint.textContent=type==='email'?'Email aktif untuk login permanen.':'3–30 karakter tanpa spasi. Tidak membutuhkan email.';
+}
+
 async function createUser() {
   if (!isSuperAdmin()) { showToast('Hanya Super Admin dengan login email yang dapat membuat akun permanen.', 'error'); return; }
-  const email=document.getElementById('newUser').value.trim().toLowerCase();
+  const loginType=document.getElementById('newLoginType').value;
+  const login=document.getElementById('newUser').value.trim().toLowerCase();
   const displayName=document.getElementById('newDisplayName').value.trim();
   const password=document.getElementById('newPass').value;
   const role=document.getElementById('newRole').value;
-  if(!/^\S+@\S+\.\S+$/.test(email)){showToast('Masukkan email login yang valid.','error');return;}
+  if(loginType==='email'&&!/^\S+@\S+\.\S+$/.test(login)){showToast('Masukkan email login yang valid.','error');return;}
+  if(loginType==='username'&&!/^[a-z0-9._-]{3,30}$/.test(login)){showToast('Username 3–30 karakter tanpa spasi. Gunakan huruf kecil, angka, titik, _ atau -.','error');return;}
   if(password.length<8){showToast('Password sementara minimal 8 karakter.','error');return;}
   const btn=document.getElementById('createCloudUserBtn');if(btn){btn.disabled=true;btn.textContent='⏳ Membuat...';}
   try{
-    await cloudUserApi('POST',{email,password,display_name:displayName,role});
+    await cloudUserApi('POST',{login_type:loginType,login,password,display_name:displayName,role});
     document.getElementById('newUser').value='';document.getElementById('newDisplayName').value='';document.getElementById('newPass').value='';
-    addAudit('CREATE_CLOUD_USER',`Membuat akun permanen ${email} (${role})`);
-    showToast(`✅ Akun ${email} berhasil dibuat dan dapat login dari PC lain.`, 'success');
+    addAudit('CREATE_CLOUD_USER',`Membuat akun permanen ${login} (${role})`);
+    showToast(`✅ Akun ${login} berhasil dibuat dan dapat login dari PC lain.`, 'success');
     await loadCloudUsers();
   }catch(err){showToast('❌ Gagal membuat akun: '+err.message,'error');}
   finally{if(btn){btn.disabled=false;btn.textContent='☁️ Buat Akun Permanen';}}
 }
 async function updateCloudUserRole(id,role){try{await cloudUserApi('PATCH',{id,role});showToast('✅ Role berhasil diperbarui.','success');await loadCloudUsers();}catch(err){showToast('❌ '+err.message,'error');await loadCloudUsers();}}
 async function toggleCloudUser(id,active){try{await cloudUserApi('PATCH',{id,active});showToast(active?'✅ Akun diaktifkan.':'⛔ Akun dinonaktifkan.','success');await loadCloudUsers();}catch(err){showToast('❌ '+err.message,'error');}}
-async function resetCloudUserPassword(id){const email=cloudUsers.find(u=>u.id===id)?.email||'akun';const password=prompt(`Password sementara baru untuk ${email} (minimal 8 karakter):`);if(password===null)return;if(password.length<8){showToast('Password minimal 8 karakter.','error');return;}try{await cloudUserApi('PATCH',{id,password});showToast('✅ Password berhasil diperbarui.','success');}catch(err){showToast('❌ '+err.message,'error');}}
-async function deleteCloudUser(id){const email=cloudUsers.find(u=>u.id===id)?.email||'akun';if(!confirm(`Hapus permanen akun ${email}?`))return;try{await cloudUserApi('DELETE',{id});showToast('✅ Akun permanen dihapus.','success');await loadCloudUsers();}catch(err){showToast('❌ '+err.message,'error');}}
+async function resetCloudUserPassword(id){const email=cloudUsers.find(u=>u.id===id)?.login_name||cloudUsers.find(u=>u.id===id)?.email||'akun';const password=prompt(`Password sementara baru untuk ${email} (minimal 8 karakter):`);if(password===null)return;if(password.length<8){showToast('Password minimal 8 karakter.','error');return;}try{await cloudUserApi('PATCH',{id,password});showToast('✅ Password berhasil diperbarui.','success');}catch(err){showToast('❌ '+err.message,'error');}}
+async function deleteCloudUser(id){const email=cloudUsers.find(u=>u.id===id)?.login_name||cloudUsers.find(u=>u.id===id)?.email||'akun';if(!confirm(`Hapus permanen akun ${email}?`))return;try{await cloudUserApi('DELETE',{id});showToast('✅ Akun permanen dihapus.','success');await loadCloudUsers();}catch(err){showToast('❌ '+err.message,'error');}}
 
 // Fungsi lama dipertahankan sebagai alias aman; pengelolaan baru memakai Supabase.
 function editUser(){showToast('Gunakan kontrol Role/Status pada tabel akun permanen.','info');}
@@ -2597,7 +2626,8 @@ function renderUserTable() {
   tbody.innerHTML=cloudUsers.map(u=>{
     const owner=u.role==='super_admin'||u.is_owner;
     const roleControl=owner?`<span class="badge ok">${roleLabel(u.role)}</span>`:`<select onchange="updateCloudUserRole('${u.id}',this.value)" style="background:#0c0a18;color:#fff;border:1px solid #302852;border-radius:7px;padding:5px;"><option value="operator" ${u.role==='operator'?'selected':''}>Gudang</option><option value="viewer" ${u.role==='viewer'?'selected':''}>Viewer</option><option value="approver" ${u.role==='approver'?'selected':''}>Approver</option><option value="admin" ${u.role==='admin'?'selected':''}>Admin</option></select>`;
-    return `<tr><td style="font-weight:700;color:#c4b5fd;">${escapeHtml(u.email)}</td><td>${escapeHtml(u.display_name)}</td><td>${roleControl}</td><td><span class="badge ${u.active?'ok':'crit'}">${u.active?'AKTIF':'NONAKTIF'}</span></td><td>${u.last_sign_in_at?formatDateSimple(u.last_sign_in_at):'Belum login'}</td><td>${owner?'<span class="text-muted">Akun Pemilik</span>':`<button class="btn" style="padding:3px 7px;font-size:10px;" onclick="toggleCloudUser('${u.id}',${!u.active})">${u.active?'⛔ Nonaktifkan':'✅ Aktifkan'}</button> <button class="btn" style="padding:3px 7px;font-size:10px;" onclick="resetCloudUserPassword('${u.id}')">🔑 Password</button> <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="deleteCloudUser('${u.id}')">🗑️</button>`}</td></tr>`;
+    const loginDisplay=u.login_name?`@${escapeHtml(u.login_name)} <span class="badge ok" style="font-size:8px;">USERNAME</span>`:escapeHtml(u.email);
+    return `<tr><td style="font-weight:700;color:#c4b5fd;">${loginDisplay}</td><td>${escapeHtml(u.display_name)}</td><td>${roleControl}</td><td><span class="badge ${u.active?'ok':'crit'}">${u.active?'AKTIF':'NONAKTIF'}</span></td><td>${u.last_sign_in_at?formatDateSimple(u.last_sign_in_at):'Belum login'}</td><td>${owner?'<span class="text-muted">Akun Pemilik</span>':`<button class="btn" style="padding:3px 7px;font-size:10px;" onclick="toggleCloudUser('${u.id}',${!u.active})">${u.active?'⛔ Nonaktifkan':'✅ Aktifkan'}</button> <button class="btn" style="padding:3px 7px;font-size:10px;" onclick="resetCloudUserPassword('${u.id}')">🔑 Password</button> <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="deleteCloudUser('${u.id}')">🗑️</button>`}</td></tr>`;
   }).join('');
 }
 
@@ -2674,13 +2704,19 @@ async function getValidSupabaseAccessToken(){
   const expires=Number(s.expires_at||0);if(!expires||expires>Date.now()/1000+60)return s.access_token;
   try{const fresh=await authApi({action:'refresh',refresh_token:s.refresh_token});saveAuthSession(fresh);return fresh.access_token||null;}catch(e){saveAuthSession(null);if(currentUser?.auth_type==='supabase'){sessionStorage.removeItem('stock_user');localStorage.removeItem('stock_auth_user');currentUser=null;}return null;}
 }
-async function loginWithSupabase(email,password){
+async function loginWithSupabase(email,password,loginName=''){
   const session=await authApi({action:'login',email,password});saveAuthSession(session);
   let profile=null;
   try{const {data,error}=await supabaseClient.from('profiles').select('*').eq('id',session.user.id);if(!error&&data?.length)profile=data[0];}catch(e){}
   if(profile&&profile.active===false){saveAuthSession(null);throw new Error('Akun dinonaktifkan oleh Admin.');}
   const role=profile?.role||session.user?.user_metadata?.role||'viewer';
-  currentUser={username:profile?.display_name||email.split('@')[0],email,role,auth_type:'supabase',user_id:session.user.id};
+  const permanentUsername=profile?.login_name||session.user?.user_metadata?.login_name||loginName||'';
+  currentUser={
+    username:profile?.display_name||permanentUsername||email.split('@')[0],
+    email:permanentUsername?'':email,
+    login_name:permanentUsername||null,
+    role,auth_type:'supabase',user_id:session.user.id
+  };
   sessionStorage.setItem('stock_user',JSON.stringify(currentUser));localStorage.setItem('stock_auth_user',JSON.stringify(currentUser));return currentUser;
 }
 
