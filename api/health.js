@@ -20,6 +20,7 @@ module.exports = async (req, res) => {
     checked_at: new Date().toISOString(),
     database,
     auth_proxy: { ok: true, mode: 'dual-transition' },
+    permanent_users: { configured: !!process.env.SUPABASE_SERVICE_ROLE_KEY },
     cron: { configured: true, schedule_utc: '0 1 * * *', schedule_wib: '08:00 WIB' },
     runtime: 'vercel-serverless'
   });
