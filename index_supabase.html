@@ -2907,7 +2907,7 @@ function exportAllStockWorkbook(){
   const gf=getGlobalFilters(), start=document.getElementById('stockExportStart')?.value||gf.start, end=document.getElementById('stockExportEnd')?.value||gf.end;
   if(start&&end&&start>end){showToast('Tanggal mulai tidak boleh melebihi tanggal selesai!','error');return;}
   const wb=XLSX.utils.book_new();
-  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,label])=>{let rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);rows=applyGlobalStockFilter(rows,label).sort((a,b)=>String(a.kode||'').localeCompare(String(b.kode||''),'id',{numeric:true}));const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
+  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,label])=>{let rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);rows=applyGlobalStockFilter(rows,label).sort((a,b)=>String(a.kode||'').localeCompare(String(b.kode||''),'id',{numeric:true}));const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'CEK RUMUS':Math.abs(num(r.akhir)-(num(r.awal)+num(r.totalIn)-num(r.totalOut)))<0.000001?'SESUAI':'SELISIH','SELISIH HITUNG':num(r.akhir)-(num(r.awal)+num(r.totalIn)-num(r.totalOut)),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
   XLSX.writeFile(wb,`Rekap_Semua_Stok_${start||'awal'}_sd_${end||'berjalan'}.xlsx`);showToast('✅ Semua stok berhasil didownload dalam 3 sheet!','success');
 }
 
@@ -2976,7 +2976,7 @@ function previewBulkUpload(){
   const input=document.getElementById('fileUpload'),file=input?.files?.[0],box=document.getElementById('bulkPreviewBox');
   if(!file||!box){showToast('Pilih file Excel dulu!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
   bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0,autoTicketCount=0;const autoSeq={},seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=parseBulkQuantity(r[4]),tglRaw=r[0],m=data.master.find(x=>x.kode===kode);const tgl=tglRaw?excelDateToISO(tglRaw):'';const manualTicket=String(r[1]??'').trim();const autoType=jenis==='in'?'IN':'OUT';const autoKey=`${autoType}|${tgl}`;if(!manualTicket){autoSeq[autoKey]=(autoSeq[autoKey]||0)+1;autoTicketCount++;}const ticket=manualTicket||generateBulkTicket(jenis,tgl,autoSeq[autoKey]);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const gerai=String(r[5]||'Gerai Utama').trim();const key=bulkRowBaseKey(tgl,ticket,kode,jenis,gerai);if(seen.has(key)||data.logs.some(l=>bulkRowBaseKey(l.tanggal,l.ticket,l.kode,num(l.in)>0?'in':'out',l.gerai)===key))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
-  box.classList.remove('hidden');box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge ok">Ticket otomatis: ${autoTicketCount}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'crit':'ok'}">Potensi stok negatif: ${negative}</span></div>${invalid.length?`<div style="font-size:10px;color:#fca5a5;max-height:90px;overflow:auto;">${invalid.slice(0,20).map(x=>`Baris ${x.baris}: ${x.reason}`).join('<br>')}</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;}catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${err.message}</span>`;}};reader.readAsArrayBuffer(file);
+  box.classList.remove('hidden');box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge ok">Ticket otomatis: ${autoTicketCount}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'warn':'ok'}">Stok minus diizinkan: ${negative}</span></div>${invalid.length?`<div style="font-size:10px;color:#fca5a5;max-height:90px;overflow:auto;">${invalid.slice(0,20).map(x=>`Baris ${x.baris}: ${x.reason}`).join('<br>')}</div>`:''}${negative?`<div style="font-size:10px;color:#fbbf24;margin-top:7px;">⚠️ Stok minus tetap akan disimpan ke Log Transaksi. Saldo dapat dipulihkan melalui Transfer HO → AGEN atau transaksi IN berikutnya.</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;}catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${err.message}</span>`;}};reader.readAsArrayBuffer(file);
 }
 function approveBulkPreview(){const file=document.getElementById('fileUpload')?.files?.[0];if(!file)return;bulkPreviewApprovedSignature=bulkFileSignature(file);processBulk();}
 
@@ -3752,11 +3752,12 @@ function renderContent() {
       {key: 'kode', label: 'Kode', type: 'mono'},
       {key: 'item', label: 'Item', type: 'text'},
       {key: 'satuan', label: 'Satuan', type: 'text'},
-      {key: 'awal', label: periodMode ? 'Awal Periode' : 'Awal', type: 'num'},
-      {key: 'buffer', label: 'Buffer', type: 'num'},
+      {key: 'awal', label: periodMode ? 'Awal Periode' : 'Stok Awal', type: 'num'},
       {key: 'totalIn', label: 'Total In', type: 'num_in'},
       {key: 'totalOut', label: 'Total Out', type: 'num_out'},
-      {key: 'akhir', label: periodMode ? 'Akhir Periode' : 'Akhir', type: 'num'},
+      {key: 'akhir', label: periodMode ? 'Akhir Periode' : 'Stok Akhir', type: 'num'},
+      {key: 'buffer', label: 'Buffer Minimum', type: 'num'},
+      {key: 'formulaCheck', label: 'Cek Rumus', type: 'stock_check'},
       {key: 'status', label: 'Status', type: 'status'}
     ];
   } else if (activeTab === 'master_ho' || activeTab === 'master_agen' || activeTab === 'master_return') {
@@ -3946,6 +3947,13 @@ function renderContent() {
         } else if (c.type === 'num_out' || c.type === 'num_out_log') {
           content = (val !== '-' && val !== '' && num(val) > 0) ? '-' + fmt(val) : '';
           if (val !== '-' && val !== '' && num(val) > 0) tdCls += ' text-danger';
+        } else if (c.type === 'stock_check') {
+          const calculated = num(r.awal) + num(r.totalIn) - num(r.totalOut);
+          const difference = num(r.akhir) - calculated;
+          const valid = Math.abs(difference) < 0.000001;
+          content = valid
+            ? '<span class="badge ok" title="Stok Akhir = Stok Awal + IN − OUT">✓ SESUAI</span>'
+            : `<span class="badge crit" title="Selisih perhitungan: ${fmt(difference)}">! SELISIH ${fmt(difference)}</span>`;
         } else if (c.type === 'action_master') {
           content = !isLoggedIn() ? '—' : `
             <button class="btn" style="padding:2px 6px; font-size:10px;" onclick="editMaster('${r.id}')" title="Edit">✏️</button>
@@ -4094,6 +4102,9 @@ function exportStokByWarehouse(key) {
     row['TOTAL IN'] = num(r.totalIn);
     row['TOTAL OUT'] = num(r.totalOut);
     row[akhirLabel] = num(r.akhir);
+    const calculated = num(r.awal) + num(r.totalIn) - num(r.totalOut);
+    row['CEK RUMUS'] = Math.abs(num(r.akhir) - calculated) < 0.000001 ? 'SESUAI' : 'SELISIH';
+    row['SELISIH HITUNG'] = num(r.akhir) - calculated;
     row['STATUS'] = statusLabel[r.status] || 'AMAN';
     return row;
   });
@@ -5200,22 +5211,14 @@ async function processBulk() {
         rowsToSync.push([id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, ket, actor]);
       }
 
-      if (warningItems.length > 0) {
-        const proceed = confirm(`⚠️ PERINGATAN: Upload ini akan mengakibatkan stok negatif pada item berikut:\n\n` + warningItems.join('\n') + `\n\nApakah Anda yakin ingin memproses data ini?`);
-        if (!proceed) {
-          // Revert newly added logs!
-          data.logs.splice(data.logs.length - count, count);
-          recalculateStok();
-          saveData();
-          fileInput.value = '';
-          document.getElementById('fileName').textContent = 'Belum ada file';
-          return;
-        }
-      }
+      // Upload massal tetap dicatat walaupun saldo menjadi negatif.
+      // Kondisi ini dibutuhkan untuk alur OUT AGEN lebih dahulu, kemudian
+      // dipulihkan dengan Transfer HO → AGEN atau transaksi IN berikutnya.
+      const negativeStockCount = warningItems.length;
 
       recalculateStok();
       saveData();
-      addAudit('BULK_UPLOAD', `Upload massal ${count} transaksi via Excel`);
+      addAudit('BULK_UPLOAD', `Upload massal ${count} transaksi via Excel${negativeStockCount > 0 ? ` · ${negativeStockCount} baris menyebabkan saldo minus (diizinkan)` : ''}`);
       if (rowsToSync.length > 0) {
         showToast('⏳ Menyinkronkan data massal ke GAS...', 'info');
         const res = await syncBulkToGAS('Log_Transaksi', rowsToSync);
@@ -5226,10 +5229,11 @@ async function processBulk() {
       refreshAll();
       fileInput.value = '';
       document.getElementById('fileName').textContent = 'Belum ada file';
+      const minusInfo = negativeStockCount > 0 ? ` · ${negativeStockCount} baris membuat saldo minus dan tetap dicatat` : '';
       if (replaceCount > 0) {
-        showToast(`✅ Berhasil memproses: ${count} data baru diimpor, dan ${replaceCount} data lama di-update/ditimpa secara otomatis!`, 'success');
+        showToast(`✅ Berhasil: ${count} data baru, ${replaceCount} data diperbarui${minusInfo}!`, 'success');
       } else {
-        showToast(`✅ ${count} transaksi baru berhasil diimport!`, 'success');
+        showToast(`✅ ${count} transaksi berhasil diimpor${minusInfo}!`, 'success');
       }
     } catch(err) {
       showToast('❌ Gagal: ' + err.message, 'error');
