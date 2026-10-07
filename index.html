@@ -771,6 +771,18 @@
         <div class="form-group" style="grid-column:span 2;"><label>Keterangan</label><input type="text" id="trfKet" placeholder="Keterangan" autocomplete="off"></div>
         <div class="form-group"><button class="btn btn-primary" onclick="processTransfer()">Proses Transfer</button></div>
       </div>
+      <div id="stockMappingSection" style="margin-top:18px;padding-top:15px;border-top:1px dashed #302852;">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <div><b style="font-size:12px;color:#c4b5fd;">🔗 Mapping Auto Transfer HO → AGEN</b><div style="font-size:10px;color:#8b86a7;margin-top:3px;">Ketika OUT membuat stok AGEN minus, sistem mengambil stok HO sebatas stok yang tersedia.</div></div>
+          <span class="badge ok">AUTO TRANSFER AKTIF</span>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="form-group"><label>Barang AGEN</label><select id="mappingAgenCode"></select></div>
+          <div class="form-group"><label>Pasangan Barang HO</label><select id="mappingHoCode"></select></div>
+          <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-primary" onclick="saveStockMapping()">Simpan Mapping</button></div>
+        </div>
+        <div id="stockMappingTable"></div>
+      </div>
     </div>
 
     <div class="panel hidden" id="panelUpload">
@@ -1578,7 +1590,8 @@ let data = {
   gerai: ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'],
   audit: [],
   po: [],
-  po_deliveries: []
+  po_deliveries: [],
+  stock_mappings: []
 };
 
 let activeDash = 'home';
@@ -1720,6 +1733,7 @@ function loadData() {
         data = parsed;
         if (!data.gerai) data.gerai = ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'];
         if (!data.audit) data.audit = [];
+        if (!data.stock_mappings) data.stock_mappings = [];
         return true;
       }
     } catch(e) {}
@@ -1759,6 +1773,7 @@ function initData() {
     data.logs = [];
     data.gerai = ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'];
     data.audit = [];
+    data.stock_mappings = [];
     saveData();
   } else {
     recalculateStok();
@@ -2222,6 +2237,12 @@ async function pullData() {
       .from('gerai')
       .select('nama');
     if (geraiErr) throw geraiErr;
+
+    // Mapping HO–AGEN bersifat opsional sampai SQL fitur dijalankan.
+    try {
+      const { data: dbMappings, error: mappingErr } = await supabaseClient.from('stock_mappings').select('*');
+      if (!mappingErr) data.stock_mappings = dbMappings || [];
+    } catch (e) { console.warn('Tabel stock_mappings belum tersedia.'); }
 
     // 4. Tarik Data Purchase Orders dari Supabase
     const { data: dbPo, error: poErr } = await supabaseClient
@@ -4550,7 +4571,7 @@ async function saveEditLog() {
   addAudit('EDIT_LOG', `Mengubah transaksi tiket: ${newTicket} (${newKode})`);
   
   showToast('⏳ Menyimpan Perubahan...', 'info');
-  const res = await syncToGAS('Log_Transaksi', [id, newTgl, newTicket, newKode, master.item, master.status, inVal, outVal, newGerai, newKet, actor], 'update', id);
+  const res = await syncToGAS('Log_Transaksi', [id, newTgl, newTicket, newKode, master.item, master.status, inVal, outVal, newGerai, newKet, actor, old.no_resi || '-'], 'update', id);
   
   hideEditLog();
   refreshAll();
@@ -4660,10 +4681,11 @@ async function submitTrx() {
   const stock = data[key].find(i => i.kode === kode);
   if (!stock) { showToast('Stok tidak ditemukan!', 'error'); return; }
 
-  if (jenis === 'out' && qty > stock.akhir) {
+  if (jenis === 'out' && qty > stock.akhir && stat !== 'AGEN') {
     showToast('Stok tidak cukup! Tersedia: ' + stock.akhir, 'error');
     return;
   }
+  // Untuk AGEN, saldo minus diizinkan sementara lalu ditutup Auto Transfer HO → AGEN.
 
   const id = genId();
   const inVal = jenis === 'in' ? qty : '-';
@@ -4686,6 +4708,9 @@ async function submitTrx() {
   const prevStatus = stock.status || 'ok';
 
   recalculateStok();
+  const autoTransferResult = (stat === 'AGEN' && jenis === 'out')
+    ? buildAutomaticTransferRows({[kode]: tgl}, actor)
+    : {rows:[],transfers:[],warnings:[]};
   saveData();
   addAudit('INPUT_TRX', `Input transaksi ${jenis.toUpperCase()} (${qty}) ${kode} untuk gerai ${gerai}`);
   
@@ -4693,8 +4718,9 @@ async function submitTrx() {
   const newStatus = stock.status || 'ok';
   triggerEmailAlertIfNeeded(kode, prevStatus, newStatus);
   
-  showToast('⏳ Menyimpan ke Cloud...', 'info');
-  const res = await syncToGAS('Log_Transaksi', [id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, ket, actor, '-'], 'append');
+  showToast('⏳ Menyimpan transaksi dan Auto Transfer ke Cloud...', 'info');
+  const rowsToSync = [[id, tgl, ticket, kode, master.item, stat, inVal, outVal, gerai, ket, actor, '-'], ...autoTransferResult.rows];
+  const res = await syncBulkToGAS('Log_Transaksi', rowsToSync);
   
   refreshAll();
   document.getElementById('inQty').value = '';
@@ -4705,11 +4731,66 @@ async function submitTrx() {
   if (res && res.isOffline) {
     showToast('⚠️ Offline: Transaksi disimpan lokal & masuk antrean sinkronisasi!', 'warn');
   } else if (res && res.success) {
-    showToast('✅ Transaksi berhasil disimpan & disinkronkan!', 'success');
+    showToast(`✅ Transaksi tersimpan${autoTransferResult.transfers.length ? ` · ${autoTransferResult.transfers.length} Auto Transfer dibuat` : ''}${autoTransferResult.warnings.length ? ` · ${autoTransferResult.warnings.join(' | ')}` : ''}!`, autoTransferResult.warnings.length ? 'warn' : 'success');
   } else {
     showToast('❌ Gagal menyimpan transaksi!', 'error');
   }
 }
+
+// ===== AUTO TRANSFER HO -> AGEN BERDASARKAN SALDO MINUS =====
+function getMappedHoCode(agenCode) {
+  const manual = (data.stock_mappings || []).find(m => m.agen_code === agenCode && m.active !== false);
+  if (manual?.ho_code && data.ho.some(h => h.kode === manual.ho_code)) return { code: manual.ho_code, source: 'MANUAL' };
+  const automatic = String(agenCode || '').startsWith('AG_') ? 'HO_' + String(agenCode).slice(3) : '';
+  if (automatic && data.ho.some(h => h.kode === automatic)) return { code: automatic, source: 'OTOMATIS' };
+  return { code: '', source: 'BELUM MAPPING' };
+}
+function renderStockMappings() {
+  const agenSelect=document.getElementById('mappingAgenCode'),hoSelect=document.getElementById('mappingHoCode'),box=document.getElementById('stockMappingTable');
+  if(!agenSelect||!hoSelect||!box)return;
+  agenSelect.innerHTML=(data.agen||[]).map(x=>`<option value="${x.kode}">${x.kode} — ${x.item}</option>`).join('');
+  hoSelect.innerHTML=(data.ho||[]).map(x=>`<option value="${x.kode}">${x.kode} — ${x.item}</option>`).join('');
+  const rows=(data.agen||[]).map(a=>{const map=getMappedHoCode(a.kode),ho=data.ho.find(h=>h.kode===map.code);return {...a,hoCode:map.code,hoItem:ho?.item||'-',mapSource:map.source};});
+  box.innerHTML=`<div class="table-wrap"><div class="scroll" style="max-height:280px;"><table><thead><tr><th>AGEN</th><th>BARANG</th><th>PASANGAN HO</th><th>SUMBER</th><th>AKSI</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.kode}</td><td>${r.item}</td><td style="color:${r.hoCode?'#4ade80':'#fb7185'};">${r.hoCode||'BELUM DIPETAKAN'}</td><td><span class="badge ${r.hoCode?'ok':'crit'}">${r.mapSource}</span></td><td>${(data.stock_mappings||[]).some(m=>m.agen_code===r.kode)?`<button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="deleteStockMapping('${r.kode}')">Hapus Manual</button>`:'-'}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+async function saveStockMapping(){
+  if(!isAdmin()){showToast('Hanya Admin/Super Admin yang dapat mengubah mapping.','error');return;}
+  const agenCode=document.getElementById('mappingAgenCode')?.value,hoCode=document.getElementById('mappingHoCode')?.value;if(!agenCode||!hoCode)return;
+  const payload={agen_code:agenCode,ho_code:hoCode,active:true,updated_at:new Date().toISOString()};
+  const {error}=await supabaseClient.from('stock_mappings').upsert(payload);
+  if(error){showToast('❌ Gagal simpan mapping: '+(error.message||JSON.stringify(error)),'error');return;}
+  const idx=(data.stock_mappings||[]).findIndex(m=>m.agen_code===agenCode);if(idx>=0)data.stock_mappings[idx]=payload;else data.stock_mappings.push(payload);saveData();renderStockMappings();addAudit('MAPPING_STOCK',`${agenCode} -> ${hoCode}`);showToast('✅ Mapping HO–AGEN tersimpan.','success');
+}
+async function deleteStockMapping(agenCode){
+  if(!isAdmin())return;if(!confirm(`Hapus mapping manual ${agenCode}?`))return;const {error}=await supabaseClient.from('stock_mappings').delete().eq('agen_code',agenCode);if(error){showToast('❌ '+(error.message||JSON.stringify(error)),'error');return;}data.stock_mappings=(data.stock_mappings||[]).filter(m=>m.agen_code!==agenCode);saveData();renderStockMappings();showToast('Mapping manual dihapus.','success');
+}
+function buildAutomaticTransferRows(targetDates={},actor='System') {
+  recalculateStok();
+  const rows=[],transfers=[],warnings=[];
+  const transferNonce = Date.now().toString().slice(-6);
+  Object.keys(targetDates).forEach(agenCode=>{
+    const agen=data.agen.find(a=>a.kode===agenCode);if(!agen||num(agen.akhir)>=0)return;
+    const mapping=getMappedHoCode(agenCode);if(!mapping.code){warnings.push(`${agenCode}: belum memiliki mapping HO`);return;}
+    const ho=data.ho.find(h=>h.kode===mapping.code);if(!ho){warnings.push(`${agenCode}: barang HO ${mapping.code} tidak ditemukan`);return;}
+    const deficit=Math.abs(num(agen.akhir));
+    const available=Math.max(0,num(ho.akhir));
+    const qty=Math.min(deficit,available); // kebijakan: transfer parsial, HO tidak boleh minus
+    if(qty<=0){warnings.push(`${agenCode}: stok HO ${ho.kode} kosong, minus AGEN tersisa ${fmt(deficit)}`);return;}
+    const tgl=targetDates[agenCode]||new Date().toISOString().split('T')[0];
+    const dateCode=String(tgl).replace(/-/g,'').slice(2);
+    const ticket=`ATRF${dateCode}${String(agenCode).replace(/[^A-Z0-9]/gi,'').slice(-5)}${transferNonce}${String(rows.length/2+1).padStart(2,'0')}`;
+    const outLog={id:genId()+'H',tanggal:tgl,ticket,kode:ho.kode,item:ho.item,status:'HO',in:'-',out:qty,gerai:'INTERNAL',ket:`AUTO TRF OUT ke ${agenCode} karena saldo AGEN minus`,user:actor,no_resi:'-'};
+    const inLog={id:genId()+'A',tanggal:tgl,ticket,kode:agen.kode,item:agen.item,status:'AGEN',in:qty,out:'-',gerai:'INTERNAL',ket:`AUTO TRF IN dari ${ho.kode} untuk menutup saldo minus`,user:actor,no_resi:'-'};
+    data.logs.push(outLog,inLog);
+    rows.push([outLog.id,tgl,ticket,outLog.kode,outLog.item,'HO','-',qty,'INTERNAL',outLog.ket,actor,'-'],[inLog.id,tgl,ticket,inLog.kode,inLog.item,'AGEN',qty,'-','INTERNAL',inLog.ket,actor,'-']);
+    transfers.push({agen:agenCode,ho:ho.kode,qty,deficit,remaining:deficit-qty,ticket});
+    recalculateStok();
+    if(qty<deficit)warnings.push(`${agenCode}: transfer parsial ${fmt(qty)}, sisa minus ${fmt(deficit-qty)} karena stok HO terbatas`);
+  });
+  if(transfers.length){saveData();addAudit('AUTO_TRANSFER',transfers.map(t=>`${t.ho}->${t.agen}:${t.qty}`).join(' | '));}
+  return {rows,transfers,warnings};
+}
+
 
 async function processTransfer() {
   if (!isLoggedIn()) { showToast('Login dulu!', 'error'); return; }
@@ -5142,6 +5223,7 @@ async function processBulk() {
 
       let replaceCount = 0;
       const autoTicketSeq = {};
+      const autoTransferDates = {};
       const bulkOccurrence = {};
       const claimedExistingIds = new Set();
 
@@ -5170,6 +5252,7 @@ async function processBulk() {
 
         const stat = getNormalizedStatus(master.status);
         const key = stat === 'HO' ? 'ho' : stat === 'AGEN' ? 'agen' : 'return';
+        if (stat === 'AGEN' && jenis === 'out') autoTransferDates[kode] = tgl;
         const stock = data[key].find(i => i.kode === kode);
         if (!stock) continue;
 
@@ -5246,6 +5329,8 @@ async function processBulk() {
       const negativeStockCount = warningItems.length;
 
       recalculateStok();
+      const autoTransferResult = buildAutomaticTransferRows(autoTransferDates, actor);
+      if (autoTransferResult.rows.length) rowsToSync.push(...autoTransferResult.rows);
       saveData();
       addAudit('BULK_UPLOAD', `Upload massal ${count} transaksi via Excel${negativeStockCount > 0 ? ` · ${negativeStockCount} baris menyebabkan saldo minus (diizinkan)` : ''}`);
       if (rowsToSync.length > 0) {
@@ -5258,11 +5343,13 @@ async function processBulk() {
       refreshAll();
       fileInput.value = '';
       document.getElementById('fileName').textContent = 'Belum ada file';
-      const minusInfo = negativeStockCount > 0 ? ` · ${negativeStockCount} baris membuat saldo minus dan tetap dicatat` : '';
+      const minusInfo = negativeStockCount > 0 ? ` · ${negativeStockCount} baris sempat membuat saldo minus` : '';
+      const transferInfo = autoTransferResult.transfers.length > 0 ? ` · ${autoTransferResult.transfers.length} auto-transfer dibuat` : '';
+      const warningInfo = autoTransferResult.warnings.length ? ` · PERINGATAN: ${autoTransferResult.warnings.join(' | ')}` : '';
       if (replaceCount > 0) {
-        showToast(`✅ Berhasil: ${count} data baru, ${replaceCount} data diperbarui${minusInfo}!`, 'success');
+        showToast(`✅ Berhasil: ${count} data baru, ${replaceCount} data diperbarui${minusInfo}${transferInfo}${warningInfo}!`, autoTransferResult.warnings.length ? 'warn' : 'success');
       } else {
-        showToast(`✅ ${count} transaksi berhasil diimpor${minusInfo}!`, 'success');
+        showToast(`✅ ${count} transaksi berhasil diimpor${minusInfo}${transferInfo}${warningInfo}!`, autoTransferResult.warnings.length ? 'warn' : 'success');
       }
     } catch(err) {
       showToast('❌ Gagal: ' + err.message, 'error');
@@ -6095,6 +6182,7 @@ function refreshAll() {
   if (activeDash === 'home') renderExecutiveDashboard();
   if (activeDash === 'forecast') renderForecastDashboard();
   if (activeDash === 'po_recommendation') renderPoRecommendation();
+  if (activeDash === 'transfer') renderStockMappings();
   if (activeDash === 'system_status') { const d=JSON.parse(localStorage.getItem('livestock_last_diagnostics')||'null'); if(d) renderDiagnostics(d); }
   renderContent();
   populateDropdowns();
@@ -6142,6 +6230,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (dash === 'forecast') renderForecastDashboard();
         if (dash === 'po_recommendation') renderPoRecommendation();
         if (dash === 'system_status') runSystemDiagnostics();
+        return;
+      }
+
+      if (dash === 'transfer') {
+        activeTab = 'transfer';
+        showPanel(dash);
+        renderContent();
+        renderStockMappings();
         return;
       }
 
