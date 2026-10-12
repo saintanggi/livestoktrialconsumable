@@ -133,7 +133,11 @@ export async function startBot(opts = {}) {
       const code = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = code === DisconnectReason.loggedOut;
       console.log(`[wa] koneksi putus (code: ${code}). ${loggedOut ? 'Sesi logout — hapus folder auth & pairing ulang.' : 'Mencoba sambung ulang...'}`);
-      if (!loggedOut) setTimeout(() => startBot(opts), 5000); // opts diteruskan!
+      if (loggedOut) {
+        if (typeof opts.onLoggedOut === 'function') opts.onLoggedOut();
+      } else {
+        setTimeout(() => startBot(opts), 5000); // opts diteruskan!
+      }
     }
   });
 
