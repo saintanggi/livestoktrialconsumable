@@ -20,8 +20,9 @@ function textOf(m) {
 }
 
 /**
- * Pasang handler ke sebuah socket Baileys. Dipisah agar bisa di-test
+ * Pasang handler pesan ke sebuah socket Baileys. Dipisah agar bisa di-test
  * tanpa koneksi WhatsApp asli (cukup socket palsu).
+ * (Siklus koneksi/reconnect ditangani startBot, bukan di sini.)
  */
 export function attachHandlers(sock) {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -56,34 +57,43 @@ export function attachHandlers(sock) {
       }
     }
   });
-
-  sock.ev.on('connection.update', (u) => {
-    const { connection, lastDisconnect } = u;
-    if (connection === 'open') console.log('[wa] bot online, siap menerima chat');
-    if (connection === 'close') {
-      const code = lastDisconnect?.error?.output?.statusCode;
-      const loggedOut = code === DisconnectReason.loggedOut;
-      console.log(`[wa] koneksi putus (code: ${code}). ${loggedOut ? 'Sesi logout — hapus folder auth & scan ulang.' : 'Mencoba sambung ulang...'}`);
-      if (!loggedOut) setTimeout(startBot, 5000);
-    }
-  });
-
-  sock.ev.on('creds.update', () => {});
 }
 
-/** Jalankan bot: pairing via QR di terminal, lalu standby. */
-export async function startBot() {
+/**
+ * Jalankan bot.
+ * opts:
+ *   - agent: proxy agent untuk WebSocket (opsional; perlu kalau di balik proxy)
+ *   - onQR(qrString): dipanggil tiap ada QR baru (untuk render QR sendiri,
+ *     karena printQRInTerminal sudah deprecated di Baileys)
+ */
+export async function startBot(opts = {}) {
   const { state, saveCreds } = await useMultiFileAuthState(config.sessionDir);
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: true, // scan QR ini dengan WhatsApp di HP kamu
+    agent: opts.agent,
+    printQRInTerminal: false,
     browser: ['WA Stok Bot', 'Chrome', '1.0'],
   });
 
   sock.ev.on('creds.update', saveCreds);
   attachHandlers(sock);
+
+  sock.ev.on('connection.update', (u) => {
+    if (u.qr && typeof opts.onQR === 'function') {
+      opts.onQR(u.qr).catch((e) => console.error('[qr] error:', e.message));
+    }
+    const { connection, lastDisconnect } = u;
+    if (connection === 'open') console.log('[wa] bot online, siap menerima chat');
+    if (connection === 'close') {
+      const code = lastDisconnect?.error?.output?.statusCode;
+      const loggedOut = code === DisconnectReason.loggedOut;
+      console.log(`[wa] koneksi putus (code: ${code}). ${loggedOut ? 'Sesi logout — hapus folder auth & pairing ulang.' : 'Mencoba sambung ulang...'}`);
+      if (!loggedOut) setTimeout(() => startBot(opts), 5000); // opts diteruskan!
+    }
+  });
+
   return sock;
 }
