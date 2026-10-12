@@ -29,21 +29,48 @@ export function attachHandlers(sock) {
   // ID pesan yang dikirim bot sendiri -> jangan dibalas (anti loop),
   // penting untuk mode "chat dengan diri sendiri".
   const botSentIds = new Set();
-  const selfNumber = () => senderOf(sock.user?.id);
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (process.env.DEBUG_BOT) {
+      for (const m of messages || []) {
+        console.log('[dbg] upsert', JSON.stringify({
+          type,
+          fromMe: m.key?.fromMe,
+          remoteJid: m.key?.remoteJid,
+          senderPn: m.key?.senderPn,
+          id: m.key?.id,
+          msgType: m.message ? Object.keys(m.message).filter((k) => !k.endsWith('ContextInfo')) : null,
+          hasText: !!textOf(m),
+        }));
+      }
+    }
     if (type !== 'notify') return;
     for (const m of messages) {
       try {
         if (!m.message || !m.key?.id) continue;
         if (botSentIds.has(m.key.id)) continue; // balasan bot sendiri
         const jid = m.key.remoteJid || '';
-        if (!jid.endsWith('@s.whatsapp.net')) continue; // abaikan grup & channel
+        // Terima chat personal via nomor (@s.whatsapp.net) maupun LID (@lid).
+        // Grup (@g.us), channel, status tetap diabaikan.
+        const isChatJid = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');
+        if (!isChatJid) continue;
 
-        const sender = senderOf(jid);
-        // Dukung "chat dengan diri sendiri": pesan fromMe ke nomor sendiri diproses.
-        const isSelfChat = m.key.fromMe && sender && sender === selfNumber();
+        const myLid = senderOf(sock.user?.lid);
+        const myPn = senderOf(sock.user?.id);
+        const remoteNum = senderOf(jid);
+        const senderPn = senderOf(m.key.senderPn);
+
+        // Chat dengan diri sendiri: pesan fromMe yang tujuannya nomor/LID sendiri.
+        const isSelfChat = m.key.fromMe && !!remoteNum && (remoteNum === myLid || remoteNum === myPn);
         if (m.key.fromMe && !isSelfChat) continue;
+
+        // Identitas pengirim untuk whitelist: utamakan nomor HP.
+        // (@lid orang lain -> pakai senderPn bila ada; LID sendiri -> nomor sendiri)
+        let sender = remoteNum;
+        if (jid.endsWith('@lid')) {
+          if (senderPn) sender = senderPn;
+          else if (remoteNum === myLid && myPn) sender = myPn;
+        }
         if (config.allowedSenders.length > 0 && !config.allowedSenders.includes(sender)) {
           console.log(`[in] pengirim tidak diizinkan: ${sender} (diabaikan)`);
           continue;
