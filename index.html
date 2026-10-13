@@ -436,6 +436,7 @@
       <button class="dash-btn" data-dash="ho">🏢 HO</button>
       <button class="dash-btn" data-dash="agen">🏪 AGEN</button>
       <button class="dash-btn" data-dash="return">📦 RETURN</button>
+      <button class="dash-btn" data-dash="clm" style="color:#67e8f9;border-color:#06b6d455;">🧰 CLM</button>
       <button class="dash-btn auth-btn" data-dash="po" style="display:none; color:#58a6ff; border-color:#58a6ff55;">📄 PO & Penerimaan</button>
       <button class="dash-btn" data-dash="forecast" style="color:#c084fc;border-color:#7c3aed55;">🔮 Prediksi Stok</button>
       <button class="dash-btn" data-dash="po_recommendation" style="color:#fbbf24;border-color:#f2a93b55;">🧮 Rekomendasi PO</button>
@@ -535,7 +536,7 @@
         <p style="margin:0;color:#a29dbd;font-size:12px;">Estimasi berdasarkan rata-rata transaksi OUT selama 30 hari terakhir. Hasil prediksi bersifat rekomendasi dan tidak mengubah stok.</p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-        <select id="forecastWarehouse" onchange="renderForecastDashboard()" style="max-width:170px;"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option></select>
+        <select id="forecastWarehouse" onchange="renderForecastDashboard()" style="max-width:170px;"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option><option value="CLM">CLM</option></select>
         <select id="forecastRisk" onchange="renderForecastDashboard()" style="max-width:190px;"><option value="ALL">Semua Prediksi</option><option value="URGENT">≤ 7 hari</option><option value="SOON">8–30 hari</option><option value="NO_USAGE">Tanpa pengeluaran</option></select>
         <button class="btn btn-success" onclick="exportForecastExcel()">📥 Download Prediksi</button>
       </div>
@@ -549,7 +550,7 @@
         <p style="margin:0;color:#a29dbd;font-size:12px;">Rekomendasi QTY untuk memenuhi kebutuhan 30 hari ditambah buffer. Tidak membuat PO secara otomatis sehingga proses PO lama tetap aman.</p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-        <select id="poRecWarehouse" onchange="renderPoRecommendation()" style="max-width:170px;"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option></select>
+        <select id="poRecWarehouse" onchange="renderPoRecommendation()" style="max-width:170px;"><option value="ALL">Semua Gudang</option><option value="HO">HO</option><option value="AGEN">AGEN</option><option value="RETURN">RETURN</option><option value="CLM">CLM</option></select>
         <button class="btn btn-success" onclick="exportPoRecommendation()">📥 Download Rekomendasi PO</button>
       </div>
       <div id="poRecommendationContent"></div>
@@ -577,7 +578,7 @@
     <!-- PANEL GRAFIK KHUSUS TERPISAH -->
     <div class="panel hidden" id="panelGrafik">
       <h3>📈 Dashboard Grafik & Analitik Global</h3>
-      <p>Visualisasi terpusat seluruh stok gudang (HO, AGEN, RETURN), tren transaksi harian, dan produk teratas secara global.</p>
+      <p>Visualisasi terpusat seluruh stok gudang (HO, AGEN, RETURN, CLM), tren transaksi harian, dan produk teratas secara global.</p>
       
       <div class="analytics-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 14px;">
         <div class="chart-card">
@@ -847,7 +848,7 @@
           <select id="mStatus">
             <option value="HO">HO</option>
             <option value="AGEN">AGEN</option>
-            <option value="RETURN">RETURN</option>
+            <option value="RETURN">RETURN</option><option value="CLM">CLM</option>
           </select>
         </div>
         <div class="form-group"><label>Kode</label><input type="text" id="mKode" placeholder="KODE_ITEM"></div>
@@ -972,6 +973,7 @@
             <button class="btn btn-success" onclick="exportLogByWarehouse('HO')">📥 Excel HO</button>
             <button class="btn btn-success" onclick="exportLogByWarehouse('AGEN')">📥 Excel AGEN</button>
             <button class="btn btn-success" onclick="exportLogByWarehouse('RETURN')">📥 Excel RETURN</button>
+            <button class="btn btn-success" onclick="exportLogByWarehouse('CLM')">📥 Excel CLM</button>
             <button class="btn btn-primary" onclick="exportLogByWarehouse('ALL')">📥 Excel Semua</button>
           </div>
         </div>
@@ -991,6 +993,7 @@
             <button class="btn btn-success" onclick="exportStokByWarehouse('ho')">📥 Stok HO</button>
             <button class="btn btn-success" onclick="exportStokByWarehouse('agen')">📥 Stok AGEN</button>
             <button class="btn btn-success" onclick="exportStokByWarehouse('return')">📥 Stok RETURN</button>
+            <button class="btn btn-success" onclick="exportStokByWarehouse('clm')">📥 Stok CLM</button>
             <button class="btn btn-primary" onclick="exportAllStockWorkbook()">📚 Semua Stok (3 Sheet)</button>
           </div>
         </div>
@@ -1009,7 +1012,7 @@
                 <option value="ALL">Semua</option>
                 <option value="HO">HO</option>
                 <option value="AGEN">AGEN</option>
-                <option value="RETURN">RETURN</option>
+                <option value="RETURN">RETURN</option><option value="CLM">CLM</option>
               </select>
             </div>
             <div class="form-group" style="flex-direction:row; align-items:flex-end; gap:6px; flex-wrap:wrap;">
@@ -1159,7 +1162,7 @@
       <select id="editMasterStatus">
         <option value="HO">HO</option>
         <option value="AGEN">AGEN</option>
-        <option value="RETURN">RETURN</option>
+        <option value="RETURN">RETURN</option><option value="CLM">CLM</option>
       </select>
     </div>
     <div class="form-group"><label>Kode</label><input type="text" id="editMasterKode"></div>
@@ -1585,6 +1588,7 @@ let data = {
   ho: [],
   agen: [],
   return: [],
+  clm: [],
   master: [],
   logs: [],
   gerai: ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'],
@@ -1733,6 +1737,7 @@ function loadData() {
         data = parsed;
         if (!data.gerai) data.gerai = ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'];
         if (!data.audit) data.audit = [];
+        if (!data.clm) data.clm = [];
         if (!data.stock_mappings) data.stock_mappings = [];
         return true;
       }
@@ -1742,7 +1747,7 @@ function loadData() {
 }
 
 function buildStokFromMaster(master) {
-  const ho = [], agen = [], ret = [];
+  const ho = [], agen = [], ret = [], clm = [];
   master.forEach((m, idx) => {
     const obj = {
       id: m.id,
@@ -1760,8 +1765,9 @@ function buildStokFromMaster(master) {
     if (m.status === 'HO') ho.push(obj);
     else if (m.status === 'AGEN') agen.push(obj);
     else if (m.status === 'RETURN') ret.push(obj);
+    else if (m.status === 'CLM') clm.push(obj);
   });
-  return { ho, agen, return: ret };
+  return { ho, agen, return: ret, clm };
 }
 
 function initData() {
@@ -1770,6 +1776,7 @@ function initData() {
     data.ho = [];
     data.agen = [];
     data.return = [];
+    data.clm = [];
     data.logs = [];
     data.gerai = ['Gerai Utama', 'Cabang BSD', 'Cabang Jakarta', 'Cabang Bandung'];
     data.audit = [];
@@ -1793,7 +1800,15 @@ function getNormalizedStatus(status) {
   let s = String(status || 'HO').toUpperCase();
   if (s === 'AGEN') return 'AGEN';
   if (s === 'RETURN') return 'RETURN';
+  if (s === 'CLM') return 'CLM';
   return 'HO';
+}
+function statusToDataKey(status) {
+  const s = getNormalizedStatus(status);
+  if (s === 'AGEN') return 'agen';
+  if (s === 'RETURN') return 'return';
+  if (s === 'CLM') return 'clm';
+  return 'ho';
 }
 
 // Normalisasi kode historis agar transaksi lama tetap terhubung dengan master terbaru.
@@ -1808,7 +1823,7 @@ function normalizeItemCode(code) {
 }
 
 function recalculateStok() {
-  ['ho','agen','return'].forEach(key => {
+  ['ho','agen','return','clm'].forEach(key => {
     data[key].forEach(item => {
       item.akhir = item.awal || 0;
       item.totalIn = 0;
@@ -1821,6 +1836,7 @@ function recalculateStok() {
     const s = getNormalizedStatus(log.status);
     if (s === 'AGEN') targetKey = 'agen';
     else if (s === 'RETURN') targetKey = 'return';
+    else if (s === 'CLM') targetKey = 'clm';
     else if (s === 'HO') targetKey = 'ho';
 
     const normalizedCode = normalizeItemCode(log.kode);
@@ -1840,7 +1856,7 @@ function recalculateStok() {
     }
   });
 
-  ['ho','agen','return'].forEach(key => {
+  ['ho','agen','return','clm'].forEach(key => {
     data[key].forEach(item => {
       item.status = statusBadge(item.buffer, item.akhir);
     });
@@ -1855,7 +1871,7 @@ function recalculateStok() {
 // - Total In/Out = hanya transaksi DI DALAM rentang tanggal
 // - Akhir Periode = Awal Periode + Total In - Total Out
 function getStockRowsForPeriod(key, startVal, endVal) {
-  const statusMap = { ho: 'HO', agen: 'AGEN', return: 'RETURN' };
+  const statusMap = { ho: 'HO', agen: 'AGEN', return: 'RETURN', clm: 'CLM' };
   const targetStatus = statusMap[key];
 
   const rows = (data[key] || []).map(item => Object.assign({}, item, {
@@ -2380,6 +2396,7 @@ async function pullData() {
     data.ho = stok.ho;
     data.agen = stok.agen;
     data.return = stok.return;
+    data.clm = stok.clm;
 
     recalculateStok();
     saveData();
@@ -2826,7 +2843,7 @@ let pendingRestoreBackup = null;
 
 function getAllStockRows() {
   const result = [];
-  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key, gudang]) => {
+  [['ho','HO'],['agen','AGEN'],['return','RETURN'],['clm','CLM']].forEach(([key, gudang]) => {
     (data[key] || []).forEach(item => result.push(Object.assign({}, item, { gudang })));
   });
   return result;
@@ -2915,7 +2932,7 @@ function executiveCardKey(event, target) {
 
 function renderExecutiveDashboard() {
   const el = document.getElementById('executiveDashboardContent'); if (!el) return;
-  const gf=getGlobalFilters(); let rows=[]; [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,gudang])=>{const source=(gf.start||gf.end)?getStockRowsForPeriod(key,gf.start,gf.end):(data[key]||[]);source.forEach(r=>rows.push(Object.assign({},r,{gudang})));}); rows=applyGlobalStockFilter(rows,null).filter(r=>gf.warehouse==='ALL'||r.gudang===gf.warehouse); const forecasts=getForecastRows().filter(r=>(gf.warehouse==='ALL'||r.gudang===gf.warehouse)&&(gf.status==='ALL'||r.status===gf.status));
+  const gf=getGlobalFilters(); let rows=[]; [['ho','HO'],['agen','AGEN'],['return','RETURN'],['clm','CLM']].forEach(([key,gudang])=>{const source=(gf.start||gf.end)?getStockRowsForPeriod(key,gf.start,gf.end):(data[key]||[]);source.forEach(r=>rows.push(Object.assign({},r,{gudang})));}); rows=applyGlobalStockFilter(rows,null).filter(r=>gf.warehouse==='ALL'||r.gudang===gf.warehouse); const forecasts=getForecastRows().filter(r=>(gf.warehouse==='ALL'||r.gudang===gf.warehouse)&&(gf.status==='ALL'||r.status===gf.status));
   const totalStock = rows.reduce((s,r)=>s+num(r.akhir),0);
   const crit = rows.filter(r=>r.status==='crit').length, warn = rows.filter(r=>r.status==='warn').length;
   const today = new Date().toISOString().split('T')[0];
@@ -2957,7 +2974,7 @@ function exportAllStockWorkbook(){
   const gf=getGlobalFilters(), start=document.getElementById('stockExportStart')?.value||gf.start, end=document.getElementById('stockExportEnd')?.value||gf.end;
   if(start&&end&&start>end){showToast('Tanggal mulai tidak boleh melebihi tanggal selesai!','error');return;}
   const wb=XLSX.utils.book_new();
-  [['ho','HO'],['agen','AGEN'],['return','RETURN']].forEach(([key,label])=>{let rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);rows=applyGlobalStockFilter(rows,label).sort((a,b)=>String(a.kode||'').localeCompare(String(b.kode||''),'id',{numeric:true}));const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'CEK RUMUS':Math.abs(num(r.akhir)-(num(r.awal)+num(r.totalIn)-num(r.totalOut)))<0.000001?'SESUAI':'SELISIH','SELISIH HITUNG':num(r.akhir)-(num(r.awal)+num(r.totalIn)-num(r.totalOut)),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
+  [['ho','HO'],['agen','AGEN'],['return','RETURN'],['clm','CLM']].forEach(([key,label])=>{let rows=(start||end)?getStockRowsForPeriod(key,start,end):(data[key]||[]);rows=applyGlobalStockFilter(rows,label).sort((a,b)=>String(a.kode||'').localeCompare(String(b.kode||''),'id',{numeric:true}));const out=rows.map((r,i)=>({'NO':i+1,'KODE':r.kode,'NAMA BARANG':r.item,'SATUAN':r.satuan,'STOK AWAL / AWAL PERIODE':num(r.awal),'BUFFER':num(r.buffer),'TOTAL IN':num(r.totalIn),'TOTAL OUT':num(r.totalOut),'STOK AKHIR':num(r.akhir),'CEK RUMUS':Math.abs(num(r.akhir)-(num(r.awal)+num(r.totalIn)-num(r.totalOut)))<0.000001?'SESUAI':'SELISIH','SELISIH HITUNG':num(r.akhir)-(num(r.awal)+num(r.totalIn)-num(r.totalOut)),'STATUS':statusLabel[r.status]||'AMAN'}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),`Stok_${label}`);});
   XLSX.writeFile(wb,`Rekap_Semua_Stok_${start||'awal'}_sd_${end||'berjalan'}.xlsx`);showToast('✅ Semua stok berhasil didownload dalam 3 sheet!','success');
 }
 
@@ -3025,7 +3042,7 @@ function bulkFileSignature(file){return file?`${file.name}|${file.size}|${file.l
 function previewBulkUpload(){
   const input=document.getElementById('fileUpload'),file=input?.files?.[0],box=document.getElementById('bulkPreviewBox');
   if(!file||!box){showToast('Pilih file Excel dulu!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
-  bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0,autoTicketCount=0;const autoSeq={},seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=parseBulkQuantity(r[4]),tglRaw=r[0],m=data.master.find(x=>x.kode===kode);const tgl=tglRaw?excelDateToISO(tglRaw):'';const manualTicket=String(r[1]??'').trim();const autoType=jenis==='in'?'IN':'OUT';const autoKey=`${autoType}|${tgl}`;if(!manualTicket){autoSeq[autoKey]=(autoSeq[autoKey]||0)+1;autoTicketCount++;}const ticket=manualTicket||generateBulkTicket(jenis,tgl,autoSeq[autoKey]);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const gerai=String(r[5]||'Gerai Utama').trim();const key=bulkRowBaseKey(tgl,ticket,kode,jenis,gerai);if(seen.has(key)||data.logs.some(l=>bulkRowBaseKey(l.tanggal,l.ticket,l.kode,num(l.in)>0?'in':'out',l.gerai)===key))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=stat==='HO'?data.ho:stat==='AGEN'?data.agen:data.return;sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
+  bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0,autoTicketCount=0;const autoSeq={},seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=parseBulkQuantity(r[4]),tglRaw=r[0],m=data.master.find(x=>x.kode===kode);const tgl=tglRaw?excelDateToISO(tglRaw):'';const manualTicket=String(r[1]??'').trim();const autoType=jenis==='in'?'IN':'OUT';const autoKey=`${autoType}|${tgl}`;if(!manualTicket){autoSeq[autoKey]=(autoSeq[autoKey]||0)+1;autoTicketCount++;}const ticket=manualTicket||generateBulkTicket(jenis,tgl,autoSeq[autoKey]);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const gerai=String(r[5]||'Gerai Utama').trim();const key=bulkRowBaseKey(tgl,ticket,kode,jenis,gerai);if(seen.has(key)||data.logs.some(l=>bulkRowBaseKey(l.tanggal,l.ticket,l.kode,num(l.in)>0?'in':'out',l.gerai)===key))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=data[statusToDataKey(stat)]||[];sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
   box.classList.remove('hidden');box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge ok">Ticket otomatis: ${autoTicketCount}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'warn':'ok'}">Stok minus diizinkan: ${negative}</span></div>${invalid.length?`<div style="font-size:10px;color:#fca5a5;max-height:90px;overflow:auto;">${invalid.slice(0,20).map(x=>`Baris ${x.baris}: ${x.reason}`).join('<br>')}</div>`:''}${negative?`<div style="font-size:10px;color:#fbbf24;margin-top:7px;">⚠️ Stok minus tetap akan disimpan ke Log Transaksi. Saldo dapat dipulihkan melalui Transfer HO → AGEN atau transaksi IN berikutnya.</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;}catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${err.message}</span>`;}};reader.readAsArrayBuffer(file);
 }
 function approveBulkPreview(){const file=document.getElementById('fileUpload')?.files?.[0];if(!file)return;bulkPreviewApprovedSignature=bulkFileSignature(file);processBulk();}
@@ -3056,7 +3073,7 @@ function showPanel(dash) {
     document.getElementById(panelId).classList.remove('hidden');
   }
 
-  const isMainWarehouse = ['ho', 'agen', 'return'].includes(dash);
+  const isMainWarehouse = ['ho', 'agen', 'return', 'clm'].includes(dash);
   const kpiRow = document.getElementById('kpiRow');
   const chartsSection = document.getElementById('chartsSection');
   const exportLogPanel = document.getElementById('exportLogPanel');
@@ -3069,7 +3086,7 @@ function showPanel(dash) {
 }
 
 function renderKPIs() {
-  const targetKey = activeDash === 'ho' ? 'ho' : activeDash === 'agen' ? 'agen' : 'return';
+  const targetKey = ['ho','agen','return','clm'].includes(activeDash) ? activeDash : 'ho';
   const gf = getGlobalFilters();
   let items = (gf.start || gf.end) ? getStockRowsForPeriod(targetKey, gf.start, gf.end) : (data[targetKey] || []);
   items = applyGlobalStockFilter(items, targetKey.toUpperCase());
@@ -3127,18 +3144,22 @@ function renderTabs() {
   if (activeDash === 'ho') tabs = ['master_ho', 'ho', 'logs_ho'];
   else if (activeDash === 'agen') tabs = ['master_agen', 'agen', 'logs_agen'];
   else if (activeDash === 'return') tabs = ['master_return', 'return', 'logs_return'];
-  else tabs = ['ho', 'agen', 'return', 'logs_all'];
+  else if (activeDash === 'clm') tabs = ['master_clm', 'clm', 'logs_clm'];
+  else tabs = ['ho', 'agen', 'return', 'clm', 'logs_all'];
 
   const tabLabels = {
     ho: '🏢 Stok HO',
     agen: '🏪 Stok AGEN',
     return: '📦 Stok RETURN',
+    clm: '🧰 Stok CLM',
     master_ho: '📋 Master HO',
     master_agen: '📋 Master AGEN',
     master_return: '📋 Master RETURN',
+    master_clm: '📋 Master CLM',
     logs_ho: '📝 Log HO',
     logs_agen: '📝 Log AGEN',
     logs_return: '📝 Log RETURN',
+    logs_clm: '📝 Log CLM',
     logs_all: '📝 Semua Log'
   };
 
@@ -3156,12 +3177,15 @@ function getTabCount(tab) {
   if (tab === 'ho') return data.ho.length;
   if (tab === 'agen') return data.agen.length;
   if (tab === 'return') return data.return.length;
+  if (tab === 'clm') return data.clm.length;
   if (tab === 'master_ho') return getMasterByStatus('HO').length;
   if (tab === 'master_agen') return getMasterByStatus('AGEN').length;
   if (tab === 'master_return') return getMasterByStatus('RETURN').length;
+  if (tab === 'master_clm') return getMasterByStatus('CLM').length;
   if (tab === 'logs_ho') return getLogsByStatus('HO').length;
   if (tab === 'logs_agen') return getLogsByStatus('AGEN').length;
   if (tab === 'logs_return') return getLogsByStatus('RETURN').length;
+  if (tab === 'logs_clm') return getLogsByStatus('CLM').length;
   if (tab === 'logs_all') return data.logs.length;
   return 0;
 }
@@ -3179,7 +3203,7 @@ function isLogTab(tab) {
 }
 
 function isStockTab(tab) {
-  return tab === 'ho' || tab === 'agen' || tab === 'return';
+  return tab === 'ho' || tab === 'agen' || tab === 'return' || tab === 'clm';
 }
 
 // Flag: hanya aktifkan filter periode di tab STOK jika user benar-benar mengubah tanggal filter
@@ -3417,10 +3441,7 @@ async function deleteSelectedLogs() {
     const idx = data.logs.findIndex(l => l.id === id);
     if (idx !== -1) {
       const logItem = data.logs[idx];
-      let targetKey = 'ho';
-      const s = getNormalizedStatus(logItem.status);
-      if (s === 'AGEN') targetKey = 'agen';
-      else if (s === 'RETURN') targetKey = 'return';
+      const targetKey = statusToDataKey(logItem.status);
 
       const stock = data[targetKey].find(i => i.kode === logItem.kode);
       if (stock) {
@@ -3454,10 +3475,7 @@ async function deleteLog(id) {
   if (idx === -1) { showToast('Data tidak ditemukan!', 'error'); return; }
   
   const logItem = data.logs[idx];
-  let targetKey = 'ho';
-  const s = getNormalizedStatus(logItem.status);
-  if (s === 'AGEN') targetKey = 'agen';
-  else if (s === 'RETURN') targetKey = 'return';
+  const targetKey = statusToDataKey(logItem.status);
 
   const stock = data[targetKey].find(i => i.kode === logItem.kode);
   if (stock) {
@@ -3485,7 +3503,7 @@ function renderChartsContainer() {
     return;
   }
 
-  const isWarehouseMainTab = ['ho', 'agen', 'return'].includes(activeTab);
+  const isWarehouseMainTab = ['ho', 'agen', 'return', 'clm'].includes(activeTab);
   if (!isWarehouseMainTab) {
     container.innerHTML = '';
     if (warehouseHealthChartInstance) { warehouseHealthChartInstance.destroy(); warehouseHealthChartInstance = null; }
@@ -3521,6 +3539,7 @@ function renderGlobalGrafikDashboard() {
     if (gf.warehouse !== 'ALL' && stat !== gf.warehouse) return false;
     if (stat === 'AGEN') targetKey = 'agen';
     else if (stat === 'RETURN') targetKey = 'return';
+    else if (stat === 'CLM') targetKey = 'clm';
     
     const stock = data[targetKey].find(i => i.kode === m.kode);
     if (stock) {
@@ -3537,6 +3556,7 @@ function renderGlobalGrafikDashboard() {
   const totalHoStock = chartRows('ho','HO').reduce((acc, item) => acc + num(item.akhir), 0);
   const totalAgenStock = chartRows('agen','AGEN').reduce((acc, item) => acc + num(item.akhir), 0);
   const totalReturnStock = chartRows('return','RETURN').reduce((acc, item) => acc + num(item.akhir), 0);
+  const totalClmStock = chartRows('clm','CLM').reduce((acc, item) => acc + num(item.akhir), 0);
 
   setTimeout(() => {
     if (typeof Chart === 'undefined') {
@@ -3557,11 +3577,11 @@ function renderGlobalGrafikDashboard() {
       grafikGlobalStockWarehouseInstance = new Chart(ctxStockWh, {
         type: 'bar',
         data: {
-          labels: ['Gudang HO', 'Gudang AGEN', 'Gudang RETURN'],
+          labels: ['Gudang HO', 'Gudang AGEN', 'Gudang RETURN', 'Gudang CLM'],
           datasets: [{
             label: 'Stok Kritis/Waspada',
-            data: [totalHoStock, totalAgenStock, totalReturnStock],
-            backgroundColor: ['#f2a93b', '#58a6ff', '#f85149'],
+            data: [totalHoStock, totalAgenStock, totalReturnStock, totalClmStock],
+            backgroundColor: ['#f2a93b', '#58a6ff', '#f85149', '#06b6d4'],
             borderRadius: 4
           }]
         },
@@ -3680,8 +3700,8 @@ function renderGlobalGrafikDashboard() {
     const riskCountBadge = document.getElementById('globalRiskCount');
     
     const riskItems = [];
-    ['ho', 'agen', 'return'].forEach(key => {
-      const label = key === 'return' ? 'RETURN' : key.toUpperCase();
+    ['ho', 'agen', 'return', 'clm'].forEach(key => {
+      const label = key.toUpperCase();
       chartRows(key, label).forEach(item => {
         if (item.status === 'crit' || item.status === 'warn') {
           riskItems.push({
@@ -3775,7 +3795,7 @@ function renderContent() {
       {key: 'action', label: 'Aksi / Event', type: 'mono'},
       {key: 'detail', label: 'Detail Perubahan', type: 'text'}
     ];
-  } else if (activeTab === 'ho' || activeTab === 'agen' || activeTab === 'return') {
+  } else if (activeTab === 'ho' || activeTab === 'agen' || activeTab === 'return' || activeTab === 'clm') {
     const key = activeTab;
     const gf = getGlobalFilters();
     const fStartVal = tableDateFilterTouched ? (document.getElementById('tableFilterStart')?.value || '') : gf.start;
@@ -3810,7 +3830,7 @@ function renderContent() {
       {key: 'formulaCheck', label: 'Cek Rumus', type: 'stock_check'},
       {key: 'status', label: 'Status', type: 'status'}
     ];
-  } else if (activeTab === 'master_ho' || activeTab === 'master_agen' || activeTab === 'master_return') {
+  } else if (activeTab === 'master_ho' || activeTab === 'master_agen' || activeTab === 'master_return' || activeTab === 'master_clm') {
     const status = activeTab.replace('master_', '').toUpperCase();
     rows = getMasterByStatus(status);
     cols = [
@@ -3822,7 +3842,7 @@ function renderContent() {
       {key: 'awal', label: 'Stok Awal', type: 'num'},
       {key: 'action', label: 'Aksi', type: 'action_master'}
     ];
-  } else if (activeTab === 'logs_ho' || activeTab === 'logs_agen' || activeTab === 'logs_return') {
+  } else if (activeTab === 'logs_ho' || activeTab === 'logs_agen' || activeTab === 'logs_return' || activeTab === 'logs_clm') {
     const status = activeTab.replace('logs_', '').toUpperCase();
     rows = getLogsByStatus(status).sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
     cols = [
@@ -4302,7 +4322,7 @@ function extractKode(val) {
   let s = String(val).trim();
   
   // Try matching standard "[GUDANG] KODE — Nama" format
-  const matchBrackets = s.match(/^\s*\[(?:HO|AGEN|RETURN)\]\s*([^\s—]+)/i);
+  const matchBrackets = s.match(/^\s*\[(?:HO|AGEN|RETURN|CLM)\]\s*([^\s—]+)/i);
   if (matchBrackets) {
     return normalizeItemCode(matchBrackets[1].trim());
   }
@@ -4312,7 +4332,7 @@ function extractKode(val) {
   if (parts.length > 1) {
     let rawCode = parts[0].trim();
     // remove brackets if they exist
-    return normalizeItemCode(rawCode.replace(/^\[(?:HO|AGEN|RETURN)\]\s*/i, '').trim());
+    return normalizeItemCode(rawCode.replace(/^\[(?:HO|AGEN|RETURN|CLM)\]\s*/i, '').trim());
   }
 
   // Fallback: Check if string matches any actual master item code
@@ -4361,7 +4381,7 @@ async function deleteMaster(id) {
   const item = data.master.find(m => m.id === id);
   if (!item) { showToast('Item tidak ditemukan!', 'error'); return; }
   data.master = data.master.filter(m => m.id !== id);
-  const key = item.status === 'HO' ? 'ho' : item.status === 'AGEN' ? 'agen' : 'return';
+  const key = statusToDataKey(item.status);
   data[key] = data[key].filter(i => i.id !== id);
   
   recalculateStok();
@@ -4424,8 +4444,8 @@ async function saveEditMaster() {
   }
 
   data.master[idx] = { ...old, kode: newKode, item: newNama, status: newStatus, satuan: newSatuan, buffer: newBuffer, awal: newAwal, foto_barang_url: fotoUrl };
-  const oldKey = old.status === 'HO' ? 'ho' : old.status === 'AGEN' ? 'agen' : 'return';
-  const newKey = newStatus === 'HO' ? 'ho' : newStatus === 'AGEN' ? 'agen' : 'return';
+  const oldKey = statusToDataKey(old.status);
+  const newKey = statusToDataKey(newStatus);
 
   data[oldKey] = data[oldKey].filter(i => i.id !== id);
   data[newKey].push({
@@ -4508,16 +4528,12 @@ async function saveEditLog() {
   const master = data.master.find(m => m.kode === newKode);
   if (!master) { showToast('Item tidak ditemukan! Pilih item dari daftar yang tersedia.', 'error'); return; }
 
-  let oldKey = 'ho';
   const oldStat = getNormalizedStatus(old.status);
-  if (oldStat === 'AGEN') oldKey = 'agen';
-  else if (oldStat === 'RETURN') oldKey = 'return';
+  const oldKey = statusToDataKey(oldStat);
 
   // Prevent Negative Stock on editing transaction
-  let newKey = 'ho';
   const newStat = getNormalizedStatus(master.status);
-  if (newStat === 'AGEN') newKey = 'agen';
-  else if (newStat === 'RETURN') newKey = 'return';
+  const newKey = statusToDataKey(newStat);
 
   const normalizedOldCode = normalizeItemCode(old.kode);
   const oldStock = data[oldKey].find(i => i.kode === normalizedOldCode);
@@ -4622,7 +4638,7 @@ async function saveMaster() {
 
   const id = genId();
   data.master.push({ id, kode, item: nama, status, satuan, buffer, awal, foto_barang_url: fotoUrl });
-  const key = status === 'HO' ? 'ho' : status === 'AGEN' ? 'agen' : 'return';
+  const key = statusToDataKey(status);
   data[key].push({
     id,
     no: data[key].length + 1,
@@ -4677,7 +4693,7 @@ async function submitTrx() {
   if (!master) { showToast('Item tidak ditemukan! Pilih item dari daftar.', 'error'); return; }
 
   const stat = getNormalizedStatus(master.status);
-  const key = stat === 'HO' ? 'ho' : stat === 'AGEN' ? 'agen' : 'return';
+  const key = statusToDataKey(stat);
   const stock = data[key].find(i => i.kode === kode);
   if (!stock) { showToast('Stok tidak ditemukan!', 'error'); return; }
 
@@ -4894,7 +4910,7 @@ async function processOpname() {
   if (!master) { showToast('Item tidak ditemukan!', 'error'); return; }
 
   const stat = getNormalizedStatus(master.status);
-  const key = stat === 'HO' ? 'ho' : stat === 'AGEN' ? 'agen' : 'return';
+  const key = statusToDataKey(stat);
   const stock = data[key].find(i => i.kode === kode);
   const selisih = fisik - stock.akhir;
   if (selisih === 0) { showToast('Stok sama persis, tidak ada selisih.', 'info'); return; }
@@ -5251,7 +5267,7 @@ async function processBulk() {
         if (!master) continue;
 
         const stat = getNormalizedStatus(master.status);
-        const key = stat === 'HO' ? 'ho' : stat === 'AGEN' ? 'agen' : 'return';
+        const key = statusToDataKey(stat);
         if (stat === 'AGEN' && jenis === 'out') autoTransferDates[kode] = tgl;
         const stock = data[key].find(i => i.kode === kode);
         if (!stock) continue;
@@ -5688,10 +5704,7 @@ async function triggerEmailAlertIfNeeded(kodeItem, prevStatus, newStatus) {
       const master = data.master.find(m => m.kode === kodeItem);
       if (!master) return;
 
-      let targetKey = 'ho';
-      const stat = getNormalizedStatus(master.status);
-      if (stat === 'AGEN') targetKey = 'agen';
-      else if (stat === 'RETURN') targetKey = 'return';
+      const targetKey = statusToDataKey(master.status);
 
       const stock = data[targetKey].find(i => i.kode === kodeItem);
       if (!stock) return;
@@ -6285,6 +6298,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (dash === 'ho') activeTab = 'ho';
       else if (dash === 'agen') activeTab = 'agen';
       else if (dash === 'return') activeTab = 'return';
+      else if (dash === 'clm') activeTab = 'clm';
       else if (dash === 'master') activeTab = 'master_all';
       else activeTab = 'ho';
 

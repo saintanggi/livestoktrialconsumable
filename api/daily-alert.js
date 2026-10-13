@@ -66,7 +66,7 @@ module.exports = async (req, res) => {
     const dbLogs = await logsRes.json();
 
     // --- REKALKULASI STOK SERVER-SIDE ---
-    const ho = {}, agen = {}, ret = {};
+    const ho = {}, agen = {}, ret = {}, clm = {};
     (dbMaster || []).forEach(m => {
       const obj = {
         kode: m.kode,
@@ -80,12 +80,14 @@ module.exports = async (req, res) => {
       if (m.status === 'HO') ho[m.kode] = obj;
       else if (m.status === 'AGEN') agen[m.kode] = obj;
       else if (m.status === 'RETURN') ret[m.kode] = obj;
+      else if (m.status === 'CLM') clm[m.kode] = obj;
     });
 
     (dbLogs || []).forEach(l => {
       let targetMap = ho;
       if (l.status_item === 'AGEN') targetMap = agen;
       else if (l.status_item === 'RETURN') targetMap = ret;
+      else if (l.status_item === 'CLM') targetMap = clm;
       
       const item = targetMap[normalizeItemCode(l.kode_item)];
       if (item) {
@@ -111,6 +113,7 @@ module.exports = async (req, res) => {
     Object.values(ho).forEach(checkRisk);
     Object.values(agen).forEach(checkRisk);
     Object.values(ret).forEach(checkRisk);
+    Object.values(clm).forEach(checkRisk);
 
     // 4. JIKA TIDAK ADA BARANG RISIKO: Tidak perlu mengirim email harian!
     if (riskItems.length === 0) {
