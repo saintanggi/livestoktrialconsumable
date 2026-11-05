@@ -1734,7 +1734,19 @@ function genId() {
 }
 
 function saveData() {
-  localStorage.setItem('stock_data', JSON.stringify(data));
+  // Cache lokal HANYA cadangan: kalau penuh (log saja sudah ~7 MB di
+  // 20 ribu baris dan terus tumbuh), kegagalan simpan TIDAK BOLEH
+  // menggagalkan tarikan dari cloud atau membuat layar kembali ke cache lama.
+  try {
+    localStorage.setItem('stock_data', JSON.stringify(data));
+  } catch (e) {
+    try {
+      const slim = { ...data, audit: [] };
+      localStorage.setItem('stock_data', JSON.stringify(slim));
+    } catch (e2) {
+      console.warn('Cache lokal penuh, data tetap ditampilkan dari cloud:', e2);
+    }
+  }
 }
 
 function loadData() {
@@ -2130,12 +2142,11 @@ async function syncBulkToGAS(sheet, rows, skipQueue = false) {
     if (table === 'log_transaksi') {
       // Baca cloud untuk mengenali baris yang SUDAH masuk pada percobaan lama.
       // Ini mencegah duplikat sekaligus memulihkan baris lain yang sempat tertimpa.
-      let cloudRows = [];
-      const { data: cloudData, error: cloudReadErr } = await supabaseClient
-        .from('log_transaksi')
-        .select('id,tanggal,no_ticket,kode_item,in,out,nama_gerai,keterangan')
-        .limit(20000);
-      if (!cloudReadErr && Array.isArray(cloudData)) cloudRows = cloudData;
+      // Baca SELURUH cloud (per halaman, tanpa limit): cek duplikat dengan
+      // hanya 20.000 baris bisa melewatkan baris lama dan membuat duplikat.
+      // Kalau baca ini gagal, biarkan error naik ke antrean offline, jangan
+      // lanjut dengan cloud kosong (itu yang menciptakan duplikat).
+      const cloudRows = await fetchAllRows('log_transaksi', 'id,tanggal,no_ticket,kode_item,in,out,nama_gerai,keterangan', 'tanggal', false);
 
       const cloudById = new Map();
       const cloudByBase = new Map();
@@ -2240,21 +2251,24 @@ async function syncBulkDeleteToGAS(sheet, ids, skipQueue = false) {
 // tertua (1-3 Agustus + sebagian 4 Agustus) tidak pernah ketarik dan
 // tampak hilang di layar, padahal datanya masih utuh di Supabase.
 // Urutan kedua (id) membuat pagination stabil untuk tanggal yang sama.
-async function fetchAllRows(table, selectQuery, orderField, ascending) {
+// Jaminan ke depan: TIDAK ADA batas jumlah baris/halaman di sini. Loop
+// berhenti hanya saat server mengembalikan halaman yang tidak penuh,
+// jadi mau 20 ribu, 200 ribu, atau lebih, semuanya tetap ketarik.
+// (secondField = null untuk tabel tanpa kolom id, mis. stock_mappings.)
+async function fetchAllRows(table, selectQuery, orderField, ascending, secondField) {
   const PAGE_SIZE = 1000;
   const all = [];
-  for (let page = 0; page < 200; page++) {
-    const from = page * PAGE_SIZE;
-    const { data, error } = await supabaseClient
-      .from(table)
-      .select(selectQuery)
-      .order(orderField, { ascending })
-      .order('id', { ascending })
-      .range(from, from + PAGE_SIZE - 1);
+  let offset = 0;
+  for (;;) {
+    let query = supabaseClient.from(table).select(selectQuery).order(orderField, { ascending });
+    const second = secondField === undefined ? 'id' : secondField;
+    if (second) query = query.order(second, { ascending });
+    const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
     if (error) throw error;
     const rows = data || [];
     all.push(...rows);
     if (rows.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
   }
   const seen = new Set();
   return all.filter(r => {
@@ -2283,25 +2297,20 @@ async function pullData() {
     // inilah yang mengembalikan 1-3 Agustus yang selama ini terpotong.
     const dbLogs = await fetchAllRows('log_transaksi', '*', 'tanggal', false);
 
-    // 3. Tarik Data Gerai dari Supabase
-    const { data: dbGerai, error: geraiErr } = await supabaseClient
-      .from('gerai')
-      .select('nama');
-    if (geraiErr) throw geraiErr;
+    // 3. Tarik Data Gerai dari Supabase (per halaman juga: tanpa limit,
+    // REST default hanya 1000 baris dan gerai akan terpotong di masa depan).
+    const dbGerai = await fetchAllRows('gerai', 'nama', 'nama', true);
 
     // Mapping HO–AGEN bersifat opsional sampai SQL fitur dijalankan.
     try {
-      const { data: dbMappings, error: mappingErr } = await supabaseClient.from('stock_mappings').select('*');
-      if (!mappingErr) data.stock_mappings = dbMappings || [];
+      data.stock_mappings = await fetchAllRows('stock_mappings', '*', 'agen_code', true, null);
     } catch (e) { console.warn('Tabel stock_mappings belum tersedia.'); }
 
-    // 4. Tarik Data Purchase Orders dari Supabase
-    const { data: dbPo, error: poErr } = await supabaseClient
-      .from('purchase_orders')
-      .select('*');
-    if (poErr) {
-      console.warn('Tabel purchase_orders belum dibuat di Supabase, mengabaikan.');
-    } else {
+    // 4. Tarik Data Purchase Orders dari Supabase (per halaman juga).
+    let dbPo = null;
+    try { dbPo = await fetchAllRows('purchase_orders', '*', 'tgl_order', true); }
+    catch (e) { console.warn('Tabel purchase_orders belum dibuat di Supabase, mengabaikan.'); }
+    if (dbPo) {
       data.po = (dbPo || []).map(p => ({
         id: p.id,
         tgl_order: p.tgl_order,
@@ -2315,13 +2324,11 @@ async function pullData() {
       }));
     }
 
-    // 5. Tarik Data PO Deliveries dari Supabase
-    const { data: dbDeliveries, error: delErr } = await supabaseClient
-      .from('po_deliveries')
-      .select('*');
-    if (delErr) {
-      console.warn('Tabel po_deliveries belum dibuat di Supabase, mengabaikan.');
-    } else {
+    // 5. Tarik Data PO Deliveries dari Supabase (per halaman juga).
+    let dbDeliveries = null;
+    try { dbDeliveries = await fetchAllRows('po_deliveries', '*', 'tgl_masuk', true); }
+    catch (e) { console.warn('Tabel po_deliveries belum dibuat di Supabase, mengabaikan.'); }
+    if (dbDeliveries) {
       data.po_deliveries = (dbDeliveries || []).map(d => ({
         id: d.id,
         no_po: d.no_po,
