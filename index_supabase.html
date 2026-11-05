@@ -1200,6 +1200,7 @@ const supabaseRest = {
     let inArray = null;
 
     let limitParam = null;
+    let offsetParam = null;
     let preferUpsert = false;
     let matchOperator = 'eq';
 
@@ -1230,7 +1231,13 @@ const supabaseRest = {
         return builder;
       },
       order: (field, { ascending } = { ascending: true }) => {
-        orderParam = `${field}.${ascending ? 'asc' : 'desc'}`;
+        const part = `${field}.${ascending ? 'asc' : 'desc'}`;
+        orderParam = orderParam ? `${orderParam},${part}` : part;
+        return builder;
+      },
+      range: (from, to) => {
+        offsetParam = from;
+        limitParam = to - from + 1;
         return builder;
       },
       limit: (n) => {
@@ -1271,6 +1278,7 @@ const supabaseRest = {
               url += `&select=${selectParam}`;
               if (orderParam) url += `&order=${orderParam}`;
               if (limitParam) url += `&limit=${limitParam}`;
+              if (offsetParam !== null) url += `&offset=${offsetParam}`;
             }
             if (matchField) {
               if (inArray) {
@@ -1286,6 +1294,7 @@ const supabaseRest = {
               url += `&select=${selectParam}`;
               if (orderParam) url += `&order=${orderParam}`;
               if (limitParam) url += `&limit=${limitParam}`;
+              if (offsetParam !== null) url += `&offset=${offsetParam}`;
             }
             if (matchField) {
               if (inArray) {
@@ -2224,6 +2233,38 @@ async function syncBulkDeleteToGAS(sheet, ids, skipQueue = false) {
   }
 }
 
+
+// Tarik SEMUA baris dari sebuah tabel per halaman (1000 baris/halaman).
+// Perbaikan Nov 2026: log_transaksi sudah 20.508 baris, sedangkan pullData
+// lama hanya .limit(20000) dengan urutan terbaru dulu, sehingga 508 baris
+// tertua (1-3 Agustus + sebagian 4 Agustus) tidak pernah ketarik dan
+// tampak hilang di layar, padahal datanya masih utuh di Supabase.
+// Urutan kedua (id) membuat pagination stabil untuk tanggal yang sama.
+async function fetchAllRows(table, selectQuery, orderField, ascending) {
+  const PAGE_SIZE = 1000;
+  const all = [];
+  for (let page = 0; page < 200; page++) {
+    const from = page * PAGE_SIZE;
+    const { data, error } = await supabaseClient
+      .from(table)
+      .select(selectQuery)
+      .order(orderField, { ascending })
+      .order('id', { ascending })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+  const seen = new Set();
+  return all.filter(r => {
+    if (!r || r.id === undefined) return true;
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+}
+
 async function pullData() {
   const btn = document.querySelector('[onclick="pullData()"]');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Loading...'; }
@@ -2233,20 +2274,14 @@ async function pullData() {
     if (!supabaseClient) throw new Error('Supabase client belum diinisialisasi');
 
     // 1. Tarik Data Master dari Supabase
-    const { data: dbMaster, error: masterErr } = await supabaseClient
-      .from('master_barang')
-      .select('*')
-      .order('kode', { ascending: true })
-      .limit(20000); // Pastikan seluruh master dimuat, bukan hanya batas default REST
-    if (masterErr) throw masterErr;
+    // Tarik seluruh master per halaman (bukan limit 20000 sekali jalan),
+    // supaya tidak terpotong lagi saat jumlah baris melewati batas itu.
+    const dbMaster = await fetchAllRows('master_barang', '*', 'kode', true);
 
     // 2. Tarik Data Log Transaksi dari Supabase (Ditambahkan limit tinggi & pengurutan terbaru agar data tidak hilang/terpotong!)
-    const { data: dbLogs, error: logsErr } = await supabaseClient
-      .from('log_transaksi')
-      .select('*')
-      .order('tanggal', { ascending: false }) // Ambil transaksi terbaru terlebih dahulu
-      .limit(20000); // Naikkan limit saas default dari 1000 menjadi 20.000 baris!
-    if (logsErr) throw logsErr;
+    // Tarik seluruh log per halaman (bukan limit 20000 sekali jalan):
+    // inilah yang mengembalikan 1-3 Agustus yang selama ini terpotong.
+    const dbLogs = await fetchAllRows('log_transaksi', '*', 'tanggal', false);
 
     // 3. Tarik Data Gerai dari Supabase
     const { data: dbGerai, error: geraiErr } = await supabaseClient
