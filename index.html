@@ -3081,11 +3081,78 @@ function stableBulkRowId(baseKey, occurrence) {
 }
 let bulkPreviewApprovedSignature='';
 function bulkFileSignature(file){return file?`${file.name}|${file.size}|${file.lastModified}`:'';}
+// Satu bagian detail di Hasil Preview: tabel baris-baris yang bermasalah.
+// items kosong -> tidak tampil sama sekali. Hanya 50 baris pertama yang
+// ditampilkan agar halaman tidak berat; jumlah total tetap di judul.
+function bulkPreviewDetailSection(title, items, headerHtml, rowFn, isOpen) {
+  if (!items.length) return '';
+  const shown = items.slice(0, 50);
+  const more = items.length - shown.length;
+  return `<details ${isOpen ? 'open' : ''} style="margin-top:10px;border:1px solid #302852;border-radius:10px;padding:10px;background:#1e1830;">
+    <summary style="cursor:pointer;font-size:12px;font-weight:800;color:#e9d5ff;">${title} (${items.length}) — klik untuk ${isOpen ? 'menyembunyikan' : 'melihat'}</summary>
+    <div style="max-height:190px;overflow:auto;margin-top:8px;">
+      <table style="width:100%;font-size:11px;border-collapse:collapse;"><thead><tr>${headerHtml}</tr></thead><tbody>${shown.map(rowFn).join('')}</tbody></table>
+      ${more > 0 ? `<div style="font-size:10px;color:#a29dbd;margin-top:6px;">+ ${more} baris lagi (ditampilkan 50 pertama)</div>` : ''}
+    </div>
+  </details>`;
+}
 function previewBulkUpload(){
   const input=document.getElementById('fileUpload'),file=input?.files?.[0],box=document.getElementById('bulkPreviewBox');
-  if(!file||!box){showToast('Pilih file Excel dulu!','error');return;}if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
-  bulkPreviewApprovedSignature='';const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}),json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});let valid=0,invalid=[],replace=0,negative=0,autoTicketCount=0;const autoSeq={},seen=new Set(),sim={};for(let i=1;i<json.length;i++){const r=json[i];if(!r||r.every(v=>v===''||v==null))continue;const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=parseBulkQuantity(r[4]),tglRaw=r[0],m=data.master.find(x=>x.kode===kode);const tgl=tglRaw?excelDateToISO(tglRaw):'';const manualTicket=String(r[1]??'').trim();const autoType=jenis==='in'?'IN':'OUT';const autoKey=`${autoType}|${tgl}`;if(!manualTicket){autoSeq[autoKey]=(autoSeq[autoKey]||0)+1;autoTicketCount++;}const ticket=manualTicket||generateBulkTicket(jenis,tgl,autoSeq[autoKey]);let reason=[];if(!tglRaw)reason.push('Tanggal kosong');if(!kode)reason.push('Kode kosong');else if(!m)reason.push('Kode tidak ada di master');if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');if(qty<=0)reason.push('QTY harus > 0');if(reason.length){invalid.push({baris:i+1,reason:reason.join(', ')});continue;}const gerai=String(r[5]||'Gerai Utama').trim();const key=bulkRowBaseKey(tgl,ticket,kode,jenis,gerai);if(seen.has(key)||data.logs.some(l=>bulkRowBaseKey(l.tanggal,l.ticket,l.kode,num(l.in)>0?'in':'out',l.gerai)===key))replace++;seen.add(key);const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;if(sim[stockKey]===undefined){const arr=data[statusToDataKey(stat)]||[];sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}sim[stockKey]+=jenis==='in'?qty:-qty;if(sim[stockKey]<0)negative++;valid++;}
-  box.classList.remove('hidden');box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge ok">Ticket otomatis: ${autoTicketCount}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'warn':'ok'}">Stok minus diizinkan: ${negative}</span></div>${invalid.length?`<div style="font-size:10px;color:#fca5a5;max-height:90px;overflow:auto;">${invalid.slice(0,20).map(x=>`Baris ${x.baris}: ${x.reason}`).join('<br>')}</div>`:''}${negative?`<div style="font-size:10px;color:#fbbf24;margin-top:7px;">⚠️ Stok minus tetap akan disimpan ke Log Transaksi. Saldo dapat dipulihkan melalui Transfer HO → AGEN atau transaksi IN berikutnya.</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;}catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${err.message}</span>`;}};reader.readAsArrayBuffer(file);
+  if(!file||!box){showToast('Pilih file Excel dulu!','error');return;}
+  if(typeof XLSX==='undefined'){showToast('XLSX tidak tersedia!','error');return;}
+  bulkPreviewApprovedSignature='';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+      let valid=0,autoTicketCount=0;
+      const invalid=[],replaceDetails=[],negativeDetails=[],autoTicketDetails=[];
+      const autoSeq={},seen=new Map(),sim={};
+      for(let i=1;i<json.length;i++){
+        const r=json[i];
+        if(!r||r.every(v=>v===''||v==null))continue;
+        const baris=i+1;
+        const kode=String(r[2]||'').trim(),jenis=String(r[3]||'').trim().toLowerCase(),qty=parseBulkQuantity(r[4]),tglRaw=r[0];
+        const m=data.master.find(x=>x.kode===kode);
+        const tgl=tglRaw?excelDateToISO(tglRaw):'';
+        const manualTicket=String(r[1]??'').trim();
+        const autoType=jenis==='in'?'IN':'OUT';
+        const autoKey=`${autoType}|${tgl}`;
+        if(!manualTicket){autoSeq[autoKey]=(autoSeq[autoKey]||0)+1;autoTicketCount++;}
+        const ticket=manualTicket||generateBulkTicket(jenis,tgl,autoSeq[autoKey]);
+        const gerai=String(r[5]||'Gerai Utama').trim();
+        let reason=[];
+        if(!tglRaw)reason.push('Tanggal kosong');
+        if(!kode)reason.push('Kode kosong');
+        else if(!m)reason.push('Kode tidak ada di master');
+        if(!['in','out'].includes(jenis))reason.push('Jenis harus in/out');
+        if(qty<=0)reason.push('QTY harus > 0');
+        if(reason.length){invalid.push({baris,tanggal:tgl||String(tglRaw??''),kode,reason:reason.join(', ')});continue;}
+        if(!manualTicket)autoTicketDetails.push({baris,tanggal:tgl,ticket,kode,item:m.item,jenis,qty,gerai});
+        const key=bulkRowBaseKey(tgl,ticket,kode,jenis,gerai);
+        const existingLog=data.logs.find(l=>bulkRowBaseKey(l.tanggal,l.ticket,l.kode,num(l.in)>0?'in':'out',l.gerai)===key);
+        if(seen.has(key)){
+          replaceDetails.push({baris,tanggal:tgl,ticket,kode,item:m.item,jenis,qty,gerai,masalah:`Duplikat di file ini — sama persis dengan baris ${seen.get(key)}, baris ini akan menggantinya`});
+        }else if(existingLog){
+          replaceDetails.push({baris,tanggal:tgl,ticket,kode,item:m.item,jenis,qty,gerai,masalah:'Sudah ada di Log Transaksi — baris lama akan diganti (timpa)'});
+        }
+        seen.set(key,baris);
+        const stat=getNormalizedStatus(m.status),stockKey=stat+'|'+kode;
+        if(sim[stockKey]===undefined){const arr=data[statusToDataKey(stat)]||[];sim[stockKey]=num(arr.find(x=>x.kode===kode)?.akhir);}
+        const saldoAwal=sim[stockKey];
+        sim[stockKey]+=jenis==='in'?qty:-qty;
+        if(sim[stockKey]<0)negativeDetails.push({baris,tanggal:tgl,ticket,kode,item:m.item,status:stat,jenis,qty,gerai,saldo:`${saldoAwal} → ${sim[stockKey]}`});
+        valid++;
+      }
+      const replace=replaceDetails.length,negative=negativeDetails.length;
+      const cell=v=>`<td style="padding:4px 6px;border-bottom:1px solid #2a2440;vertical-align:top;">${escapeHtml(v)}</td>`;
+      const head=t=>`<th style="text-align:left;padding:4px 6px;color:#a29dbd;font-size:10px;">${t}</th>`;
+      box.classList.remove('hidden');
+      box.innerHTML=`<div style="padding:13px;border:1px solid #7c3aed66;background:#7c3aed10;border-radius:12px;"><b style="color:#c4b5fd;">🔍 Hasil Preview — data belum disimpan</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin:9px 0;"><span class="badge ok">Valid: ${valid}</span><span class="badge ok">Ticket otomatis: ${autoTicketCount}</span><span class="badge warn">Akan mengganti/duplikat: ${replace}</span><span class="badge ${invalid.length?'crit':'ok'}">Tidak valid: ${invalid.length}</span><span class="badge ${negative?'warn':'ok'}">Stok minus diizinkan: ${negative}</span></div>${bulkPreviewDetailSection('⛔ Tidak valid — perbaiki baris ini di Excel',invalid,`${head('Baris')}${head('Tanggal')}${head('Kode')}${head('Masalah')}`,x=>`<tr>${cell(x.baris)}${cell(x.tanggal)}${cell(x.kode)}${cell(x.reason)}</tr>`,true)}${bulkPreviewDetailSection('🔁 Akan mengganti/duplikat — cek baris ini sebelum konfirmasi',replaceDetails,`${head('Baris')}${head('Tanggal')}${head('Ticket')}${head('Barang')}${head('Jenis')}${head('QTY')}${head('Gerai')}${head('Masalah')}`,x=>`<tr>${cell(x.baris)}${cell(x.tanggal)}${cell(x.ticket)}${cell(x.kode+' — '+x.item)}${cell(x.jenis.toUpperCase())}${cell(x.qty)}${cell(x.gerai)}${cell(x.masalah)}</tr>`,true)}${bulkPreviewDetailSection('⚠️ Stok jadi minus — saldo setelah baris ini diproses',negativeDetails,`${head('Baris')}${head('Tanggal')}${head('Ticket')}${head('Barang')}${head('Jenis')}${head('QTY')}${head('Gerai')}${head('Saldo')}`,x=>`<tr>${cell(x.baris)}${cell(x.tanggal)}${cell(x.ticket)}${cell(x.kode+' — '+x.item)}${cell(x.jenis.toUpperCase())}${cell(x.qty)}${cell(x.gerai)}${cell(x.saldo)}</tr>`,true)}${bulkPreviewDetailSection('🎫 Ticket otomatis — dibuat karena kolom Ticket kosong',autoTicketDetails,`${head('Baris')}${head('Tanggal')}${head('Ticket dibuat')}${head('Barang')}${head('Jenis')}${head('QTY')}${head('Gerai')}`,x=>`<tr>${cell(x.baris)}${cell(x.tanggal)}${cell(x.ticket)}${cell(x.kode+' — '+x.item)}${cell(x.jenis.toUpperCase())}${cell(x.qty)}${cell(x.gerai)}</tr>`,false)}${negative?`<div style="font-size:10px;color:#fbbf24;margin-top:10px;">⚠️ Stok minus tetap akan disimpan ke Log Transaksi. Saldo dapat dipulihkan melalui Transfer HO → AGEN atau transaksi IN berikutnya.</div>`:''}<button class="btn btn-primary" style="margin-top:10px;" ${valid?'':'disabled'} onclick="approveBulkPreview()">✅ Konfirmasi & Proses ${valid} Data Valid</button></div>`;
+    }catch(err){box.classList.remove('hidden');box.innerHTML=`<span class="badge crit">Gagal membaca file: ${escapeHtml(err.message)}</span>`;}
+  };
+  reader.readAsArrayBuffer(file);
 }
 function approveBulkPreview(){const file=document.getElementById('fileUpload')?.files?.[0];if(!file)return;bulkPreviewApprovedSignature=bulkFileSignature(file);processBulk();}
 
